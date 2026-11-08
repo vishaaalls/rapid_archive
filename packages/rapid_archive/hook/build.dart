@@ -91,8 +91,10 @@ void main(List<String> args) async {
     final code = input.config.code;
     final os = code.targetOS;
     final triple = _triple(os, code.targetArchitecture, code);
-    final static =
-        os == OS.iOS || code.linkModePreference == LinkModePreference.static;
+    // Follow what the SDK asks for: Flutter wants dynamic libraries on every
+    // platform (it wraps them in a framework on iOS); some setups ask for
+    // static linking instead.
+    final static = code.linkModePreference == LinkModePreference.static;
 
     final crateDir = input.packageRoot.resolve('native/');
     final targetDir = input.outputDirectoryShared.resolve('cargo/');

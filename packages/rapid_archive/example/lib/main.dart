@@ -49,10 +49,10 @@ class _BenchPageState extends State<BenchPage> {
       status = 'Running with $mb MB of JSON…';
     });
     try {
-      final out = await Isolate.run(() => runAll(mb));
+      final out = await _runInBackground(mb);
       setState(() {
-        rows.addAll(out.map((m) => Row3(m['op'] as String,
-            m['a'] as double, m['r'] as double, m['ok'] as bool)));
+        rows.addAll(out.map((m) => Row3(m['op'] as String, m['a'] as double,
+            m['r'] as double, m['ok'] as bool)));
         status = 'Done. Median of 3 runs per step.';
       });
     } catch (e) {
@@ -105,6 +105,10 @@ class _BenchPageState extends State<BenchPage> {
     );
   }
 }
+
+// Top-level so the isolate closure captures only [mb], not the widget State.
+Future<List<Map<String, Object>>> _runInBackground(int mb) =>
+    Isolate.run(() => runAll(mb));
 
 // ---------------------------------------------------------------------------
 // Benchmark logic (runs inside an isolate). Also printed to the console, so
@@ -164,8 +168,10 @@ List<Map<String, Object>> runAll(int mb) {
       'gzip compress (parallel)',
       _time(() => ref.GZipEncoder().encodeBytes(data)),
       _time(() => const rapid.GZipEncoder(parallel: true).encodeBytes(data)),
-      _same(ref.GZipDecoder().decodeBytes(
-          const rapid.GZipEncoder(parallel: true).encodeBytes(data)), data));
+      _same(
+          ref.GZipDecoder().decodeBytes(
+              const rapid.GZipEncoder(parallel: true).encodeBytes(data)),
+          data));
   add(
       'gzip decompress',
       _time(() => ref.GZipDecoder().decodeBytes(refGz)),
