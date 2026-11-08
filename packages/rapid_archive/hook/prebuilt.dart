@@ -7,7 +7,32 @@ const prebuiltBaseUrl =
     'https://github.com/vishaaalls/rapid_archive/releases/download';
 
 /// Release tag holding the binaries, e.g. 'v0.1.0'.
-const prebuiltVersion = '';
+const prebuiltVersion = 'v0.1.0';
 
 /// '<rust triple>/<file name>' -> SHA-256 of the file.
-const prebuiltHashes = <String, String>{};
+const prebuiltHashes = <String, String>{
+  'aarch64-apple-darwin/librapid_archive.dylib':
+      '23a01bb6712ac9204d53ad9cf1f619f10ff23c94f71963b2e16d95e22065cc5a',
+  'aarch64-apple-ios-sim/librapid_archive.dylib':
+      '9451b198a0b671822bee8e87522714ac30a89387f550cfa80851217fb4f0a1dc',
+  'aarch64-apple-ios/librapid_archive.dylib':
+      '3163ac1ab930edc0c801c16ab627aa0b6f3f9b08811be96a6c31c28fc8a163f8',
+  'aarch64-linux-android/librapid_archive.so':
+      '2151c0f43acf4030f83eb0fd96bdca17aa3fd9b3255bcfcced09553a08474066',
+  'aarch64-pc-windows-msvc/rapid_archive.dll':
+      '7282ac12d15e9dfe98e3a82dcc98d07da193f345d36779072345befd395e4669',
+  'aarch64-unknown-linux-gnu/librapid_archive.so':
+      'a97974b7ec56618bd624bfba76c2ce9a312b7983029b1ebbd7ea792842b447a1',
+  'armv7-linux-androideabi/librapid_archive.so':
+      'a9733762fc660f22790955aa837a59fc28abaf9768b985c2e272818c586acce4',
+  'x86_64-apple-darwin/librapid_archive.dylib':
+      'cc57c85e4db52529586842f525c995886b3a3f2335d81b6e52893e07e5afbbe2',
+  'x86_64-apple-ios/librapid_archive.dylib':
+      '736587d60f0d74798119f039a125005db849895659f31e1b905b4d241c8670c1',
+  'x86_64-linux-android/librapid_archive.so':
+      '0fbd481f6e0de4ce01480f83404544400219f3a6c51258c448c981217baabc6f',
+  'x86_64-pc-windows-msvc/rapid_archive.dll':
+      'f0951217fe6f9e9d3fc071f6e78d3f9fcaa8adb32a4615e6dd5a5964ba0538b9',
+  'x86_64-unknown-linux-gnu/librapid_archive.so':
+      'ae2add517eb8254bc3ee47f2a288461073be337a8fecae0b93b3b7ef92cf329b',
+};
