@@ -54,6 +54,17 @@ still need measuring on real devices.
 At 256 MB the gap holds or widens: gzip 2x (5.2x parallel), zip extract 5.7 to 6.8x
 (see `bench/RESULTS-linux-x64-4core-256mb.txt`).
 
+### Try it on your own files
+
+```sh
+bash bench/compare.sh ~/Movies/clip.mov ~/Documents/SomeFolder ~/Downloads/thing.zip
+```
+
+A file is gzipped and gunzipped, a folder is zipped and then extracted, and a
+`.zip` is extracted. Each result is checked byte for byte against the original
+in both directions, and rapid_archive's outputs are written to `compare_out/`
+so you can open them. Options: `--runs N`, `--level 0-9`.
+
 ### Run it yourself (macOS / Linux)
 
 ```sh
