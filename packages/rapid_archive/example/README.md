@@ -11,4 +11,5 @@ flutter run --release                            # pick a simulator, emulator or
 
 Benchmark numbers only mean something in `--release` (or `--profile`) mode.
 The build needs Rust with the target for your device, for example
-`rustup target add aarch64-linux-android aarch64-apple-ios aarch64-apple-ios-sim`.
+`rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios`
+(`flutter build ios --simulator` also builds the x86_64 slice).

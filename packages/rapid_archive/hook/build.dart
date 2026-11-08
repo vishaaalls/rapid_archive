@@ -66,14 +66,28 @@ Map<String, String> _toolchainEnv(CodeConfig code, String triple) {
       env['CARGO_TARGET_${t}_RUSTFLAGS'] =
           '-C link-arg=-Wl,-z,max-page-size=16384';
     case OS.iOS:
+      _setSdkRoot(
+          env,
+          triple.endsWith('-sim') || triple.startsWith('x86_64')
+              ? 'iphonesimulator'
+              : 'iphoneos');
       env['IPHONEOS_DEPLOYMENT_TARGET'] =
           '${code.iOS.deploymentVersion.major}.${code.iOS.deploymentVersion.minor}';
     case OS.macOS:
+      _setSdkRoot(env, 'macosx');
       env['MACOSX_DEPLOYMENT_TARGET'] =
           '${code.macOS.deploymentVersion.major}.${code.macOS.deploymentVersion.minor}';
     default:
   }
   return env;
+}
+
+/// The hooks runner gives us a trimmed environment without SDKROOT, so the C
+/// compiler that builds libdeflate can't find system headers like string.h.
+void _setSdkRoot(Map<String, String> env, String sdk) {
+  final r = Process.runSync('xcrun', ['--sdk', sdk, '--show-sdk-path']);
+  final path = (r.stdout as String).trim();
+  if (r.exitCode == 0 && path.isNotEmpty) env['SDKROOT'] = path;
 }
 
 /// Xcode and Gradle builds often run without ~/.cargo/bin on PATH.
@@ -113,7 +127,12 @@ void main(List<String> args) async {
       environment: _toolchainEnv(code, triple),
     );
     if (result.exitCode != 0) {
-      throw Exception('cargo build failed for $triple:\n${result.stderr}');
+      final err = result.stderr as String;
+      if (err.contains('target may not be installed')) {
+        throw Exception('The Rust target $triple is not installed. Run:\n'
+            '  rustup target add $triple');
+      }
+      throw Exception('cargo build failed for $triple:\n$err');
     }
 
     final libName =
