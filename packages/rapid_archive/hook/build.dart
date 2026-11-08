@@ -24,11 +24,12 @@ String _triple(OS os, Architecture arch, CodeConfig code) {
     _ => throw UnsupportedError('architecture $arch'),
   };
   return switch (os) {
-    OS.android => arch == Architecture.arm
-        ? 'armv7-linux-androideabi'
-        : '$a-linux-android',
+    OS.android =>
+      arch == Architecture.arm ? 'armv7-linux-androideabi' : '$a-linux-android',
     OS.iOS => code.iOS.targetSdk == IOSSdk.iPhoneSimulator
-        ? (arch == Architecture.arm64 ? 'aarch64-apple-ios-sim' : 'x86_64-apple-ios')
+        ? (arch == Architecture.arm64
+            ? 'aarch64-apple-ios-sim'
+            : 'x86_64-apple-ios')
         : 'aarch64-apple-ios',
     OS.macOS => '$a-apple-darwin',
     OS.linux => arch == Architecture.arm
@@ -39,36 +40,82 @@ String _triple(OS os, Architecture arch, CodeConfig code) {
   };
 }
 
+/// Points cargo (and the `cc` crate that builds libdeflate) at the toolchain
+/// the Flutter/Dart SDK hands us, so Android needs no manual NDK setup.
+Map<String, String> _toolchainEnv(CodeConfig code, String triple) {
+  final env = <String, String>{};
+  final t = triple.toUpperCase().replaceAll('-', '_');
+  final u = triple.replaceAll('-', '_');
+  switch (code.targetOS) {
+    case OS.android:
+      final cc = code.cCompiler;
+      if (cc == null) break;
+      // The NDK ships per-target clang wrappers next to clang, e.g.
+      // aarch64-linux-android21-clang. They set --target and the API level.
+      final bin = File.fromUri(cc.compiler).parent.path;
+      final api = code.android.targetNdkApi;
+      final clangTriple = triple == 'armv7-linux-androideabi'
+          ? 'armv7a-linux-androideabi'
+          : triple;
+      var wrapper = '$bin/$clangTriple$api-clang';
+      if (!File(wrapper).existsSync()) wrapper = cc.compiler.toFilePath();
+      env['CARGO_TARGET_${t}_LINKER'] = wrapper;
+      env['CC_$u'] = wrapper;
+      env['AR_$u'] = cc.archiver.toFilePath();
+      // 16 KB page alignment, required for Google Play from Android 15.
+      env['CARGO_TARGET_${t}_RUSTFLAGS'] =
+          '-C link-arg=-Wl,-z,max-page-size=16384';
+    case OS.iOS:
+      env['IPHONEOS_DEPLOYMENT_TARGET'] =
+          '${code.iOS.deploymentVersion.major}.${code.iOS.deploymentVersion.minor}';
+    case OS.macOS:
+      env['MACOSX_DEPLOYMENT_TARGET'] =
+          '${code.macOS.deploymentVersion.major}.${code.macOS.deploymentVersion.minor}';
+    default:
+  }
+  return env;
+}
+
+/// Xcode and Gradle builds often run without ~/.cargo/bin on PATH.
+String _cargo() {
+  final home =
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+  final exe = Platform.isWindows ? 'cargo.exe' : 'cargo';
+  final local = home == null ? null : File('$home/.cargo/bin/$exe');
+  return local != null && local.existsSync() ? local.path : 'cargo';
+}
+
 void main(List<String> args) async {
   await build(args, (input, output) async {
     if (!input.config.buildCodeAssets) return;
     final code = input.config.code;
     final os = code.targetOS;
     final triple = _triple(os, code.targetArchitecture, code);
-    final static = os == OS.iOS ||
-        code.linkModePreference == LinkModePreference.static;
+    final static =
+        os == OS.iOS || code.linkModePreference == LinkModePreference.static;
 
     final crateDir = input.packageRoot.resolve('native/');
     final targetDir = input.outputDirectoryShared.resolve('cargo/');
-    // Android cross-compiles need the NDK linker configured for cargo, e.g.
-    // with cargo-ndk or native/.cargo/config.toml.
     final result = await Process.run(
-      'cargo',
+      _cargo(),
       [
         'build',
         '--release',
-        '--target', triple,
-        '--manifest-path', crateDir.resolve('Cargo.toml').toFilePath(),
-        '--target-dir', targetDir.toFilePath(),
+        '--target',
+        triple,
+        '--manifest-path',
+        crateDir.resolve('Cargo.toml').toFilePath(),
+        '--target-dir',
+        targetDir.toFilePath(),
       ],
+      environment: _toolchainEnv(code, triple),
     );
     if (result.exitCode != 0) {
       throw Exception('cargo build failed for $triple:\n${result.stderr}');
     }
 
-    final libName = static
-        ? os.staticlibFileName(_crate)
-        : os.dylibFileName(_crate);
+    final libName =
+        static ? os.staticlibFileName(_crate) : os.dylibFileName(_crate);
     final lib = targetDir.resolve('$triple/release/$libName');
     output.assets.code.add(CodeAsset(
       package: input.packageName,

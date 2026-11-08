@@ -1,0 +1,17 @@
+name: rapid_archive_example
+description: On-device benchmark of rapid_archive vs archive.
+publish_to: none
+version: 1.0.0
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  archive: ^4.0.0
+  rapid_archive:
+    path: ..
+
+flutter:
+  uses-material-design: true
