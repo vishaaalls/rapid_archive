@@ -12,7 +12,7 @@ jobs:
       run:
         working-directory: packages/rapid_archive/native
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -29,12 +29,12 @@ jobs:
       run:
         working-directory: packages/rapid_archive
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - run: dart pub get
+      - run: dart pub get --no-example
       - run: dart analyze lib hook
       - run: dart test -p vm
       - name: Web (WebAssembly) tests in Chrome
