@@ -41,6 +41,14 @@ void main() {
     expect(const GZipDecoder().decodeBytes(both), [...a, ...b]);
   });
 
+  test('async gzip (browser built-in on web) round trips', () async {
+    final d = text(300000);
+    final gz = await const GZipEncoder().encodeBytesAsync(d);
+    expect(ref.GZipDecoder().decodeBytes(gz), d);
+    expect(await const GZipDecoder().decodeBytesAsync(gz), d);
+    expect(await const GZipDecoder().decodeBytesAsync(ref.GZipEncoder().encodeBytes(d)), d);
+  });
+
   test('zlib and raw deflate interop', () {
     final d = text(50000);
     expect(ref.ZLibDecoder().decodeBytes(const ZLibEncoder().encodeBytes(d)), d);

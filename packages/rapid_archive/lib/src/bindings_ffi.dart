@@ -132,3 +132,11 @@ RawZip zipDecode(List<int> zip) {
   return RawZip(r.count, _owned(r.data, r.dataLen),
       _owned(r.names, r.namesLen), table);
 }
+
+/// Native platforms: the sync path is already the fastest. (Run it in an
+/// isolate with `Isolate.run` for large inputs on a UI thread.)
+Future<Uint8List> compressAsync(StreamFormat f, List<int> data, int level) async =>
+    compress(f, data, level, parallel: true);
+
+Future<Uint8List> decompressAsync(StreamFormat f, List<int> data) async =>
+    decompress(f, data);

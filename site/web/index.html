@@ -178,31 +178,31 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
           <p class="meta">sample orders.json · 32.0 MB</p>
         </div>
         <div class="speedup win">
-          <strong>5.1×</strong>
+          <strong>8.7×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">515 ms<small>62 MB/s</small></span>
+        <span class="bar-value">643 ms<small>50 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:19.8%"></span></span>
-        <span class="bar-value">102 ms<small>314 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:11.5%"></span></span>
+        <span class="bar-value">74 ms<small>434 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">Browser built-in</span>
-        <span class="bar-track"><span class="bar browser" style="width:27.7%"></span></span>
-        <span class="bar-value">143 ms<small>224 MB/s</small></span>
+        <span class="bar-track"><span class="bar browser" style="width:18.2%"></span></span>
+        <span class="bar-value">117 ms<small>273 MB/s</small></span>
       </div>
       <p class="check ok">Output verified byte for byte</p>
     </article>    <article class="result">
       <header>
         <div>
           <h3>gzip compress</h3>
-          <p class="meta">sample orders.json · 32.0 MB · output 6.7 MB vs 6.7 MB</p>
+          <p class="meta">sample orders.json · 32.0 MB · output 6.7 MB vs 6.1 MB</p>
         </div>
         <div class="speedup win">
           <strong>4.4×</strong>
@@ -212,17 +212,17 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">2.53 s<small>13 MB/s</small></span>
+        <span class="bar-value">2.35 s<small>14 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:22.8%"></span></span>
-        <span class="bar-value">577 ms<small>55 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:22.9%"></span></span>
+        <span class="bar-value">537 ms<small>60 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">Browser built-in</span>
-        <span class="bar-track"><span class="bar browser" style="width:26.3%"></span></span>
-        <span class="bar-value">666 ms<small>48 MB/s</small></span>
+        <span class="bar-track"><span class="bar browser" style="width:28.4%"></span></span>
+        <span class="bar-value">668 ms<small>48 MB/s</small></span>
       </div>
       <p class="check ok">Output verified byte for byte</p>
     </article>    <article class="result">
@@ -232,19 +232,19 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
           <p class="meta">sample orders.zip · 31.3 MB · 2000 files</p>
         </div>
         <div class="speedup win">
-          <strong>3.6×</strong>
+          <strong>3.7×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">1.68 s<small>19 MB/s</small></span>
+        <span class="bar-value">1.60 s<small>20 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:27.4%"></span></span>
-        <span class="bar-value">461 ms<small>68 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:27.0%"></span></span>
+        <span class="bar-value">430 ms<small>73 MB/s</small></span>
       </div>
       
       <p class="check ok">Output verified byte for byte</p>
@@ -255,19 +255,19 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
           <p class="meta">sample orders.zip · 31.3 MB · 2000 files, 31.3 MB unpacked</p>
         </div>
         <div class="speedup win">
-          <strong>6.1×</strong>
+          <strong>6.7×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">665 ms<small>47 MB/s</small></span>
+        <span class="bar-value">619 ms<small>50 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:16.5%"></span></span>
-        <span class="bar-value">109 ms<small>286 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:15.0%"></span></span>
+        <span class="bar-value">93 ms<small>336 MB/s</small></span>
       </div>
       
       <p class="check ok">Output verified byte for byte</p>
@@ -278,7 +278,8 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
   <section class="about">
     <h2>What this measures</h2>
     <p>Each step runs once to warm up, then the median of the chosen runs is shown. Every output is checked byte for byte against the original, and each library has to read the other's output.</p>
-    <p>On the web, rapid_archive uses zlib-rs, a pure Rust deflate, on a single thread. On Android, iOS and desktop it uses libdeflate and every CPU core, so native speedups are larger: up to 10× on an M4 MacBook.</p>
+    <p>The browser's built-in gzip is native code inside the browser, so for plain gzip it can match or beat WebAssembly, especially on Apple Silicon. That's why rapid_archive's async API (<code>encodeBytesAsync</code>, <code>decodeBytesAsync</code>) uses it on the web. WebAssembly still handles zip, which browsers can't do, plus custom compression levels and every synchronous call. At the same level, rapid_archive's gzip output is also about 9% smaller.</p>
+    <p>On Android, iOS and desktop there is no WebAssembly overhead and rapid_archive uses every CPU core, so native speedups are larger: up to 10× on an M4 MacBook.</p>
   </section>
 </div>
 

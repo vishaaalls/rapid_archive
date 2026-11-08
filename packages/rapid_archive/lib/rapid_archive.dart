@@ -41,6 +41,12 @@ class GZipEncoder {
 
   List<int> encode(List<int> bytes, {int? level}) =>
       encodeBytes(bytes, level: level);
+
+  /// Fastest gzip on every platform. On web it uses the browser's built-in
+  /// CompressionStream (when [level] is left at the default), and natively
+  /// it uses every CPU core.
+  Future<Uint8List> encodeBytesAsync(List<int> bytes, {int? level}) =>
+      ffi.compressAsync(ffi.StreamFormat.gzip, bytes, level ?? -1);
 }
 
 /// gzip decompression. Concatenated gzip members are decoded like `gunzip`.
@@ -51,6 +57,10 @@ class GZipDecoder {
   /// compatibility.
   Uint8List decodeBytes(List<int> bytes, {bool verify = false}) =>
       ffi.decompress(ffi.StreamFormat.gzip, bytes);
+
+  /// Fastest gunzip on every platform (browser built-in on web).
+  Future<Uint8List> decodeBytesAsync(List<int> bytes) =>
+      ffi.decompressAsync(ffi.StreamFormat.gzip, bytes);
 }
 
 /// zlib (RFC 1950) compression.

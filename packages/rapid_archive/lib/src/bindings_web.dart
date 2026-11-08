@@ -170,3 +170,67 @@ RawZip zipDecode(List<int> zip) {
   _call('ra_free', [tablePtr]);
   return RawZip(count, _take(dataPtr, dataLen), _take(namesPtr, namesLen), table);
 }
+
+// ---------------------------------------------------------------------------
+// Async path: the browser's own CompressionStream / DecompressionStream.
+// They run native code inside the browser, so for plain gzip/zlib on web
+// they are as fast as or faster than WebAssembly. They can't take a
+// compression level, so a custom level uses WebAssembly instead.
+// ---------------------------------------------------------------------------
+
+@JS('Blob')
+extension type _Blob._(JSObject _) implements JSObject {
+  external factory _Blob(JSArray<JSUint8Array> parts);
+  external JSObject stream();
+}
+
+@JS('Response')
+extension type _Response._(JSObject _) implements JSObject {
+  external factory _Response(JSObject body);
+  external JSPromise<JSArrayBuffer> arrayBuffer();
+}
+
+@JS('CompressionStream')
+external JSFunction? get _compressionStream;
+@JS('DecompressionStream')
+external JSFunction? get _decompressionStream;
+
+String _streamName(StreamFormat f) => switch (f) {
+      StreamFormat.gzip => 'gzip',
+      StreamFormat.zlib => 'deflate',
+      StreamFormat.deflate => 'deflate-raw',
+    };
+
+Future<Uint8List> _viaStream(JSFunction ctor, StreamFormat f, Uint8List data) async {
+  final transform = ctor.callAsConstructor<JSObject>(_streamName(f).toJS);
+  final stream = _Blob([data.toJS].toJS)
+      .stream()
+      .callMethod<JSObject>('pipeThrough'.toJS, transform);
+  final buf = await _Response(stream).arrayBuffer().toDart;
+  return buf.toDart.asUint8List();
+}
+
+Future<Uint8List> compressAsync(StreamFormat f, List<int> data, int level) async {
+  final ctor = _compressionStream;
+  if (ctor != null && (level < 0 || level == 6)) {
+    try {
+      return await _viaStream(ctor, f, asBytes(data));
+    } catch (_) {
+      // Unsupported format in this browser: fall through to WebAssembly.
+    }
+  }
+  return compress(f, data, level);
+}
+
+Future<Uint8List> decompressAsync(StreamFormat f, List<int> data) async {
+  final ctor = _decompressionStream;
+  if (ctor != null) {
+    try {
+      return await _viaStream(ctor, f, asBytes(data));
+    } catch (_) {
+      // Corrupt or unusual input (e.g. some multi-member gzip): let the
+      // WebAssembly decoder handle it and produce a proper error.
+    }
+  }
+  return decompress(f, data);
+}
