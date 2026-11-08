@@ -79,14 +79,35 @@ Options: `--mb N` input size, `--runs N` timed runs (median), `--file PATH` add
 one of your own files, `--pure` also time the pure-Dart (web) codec.
 Memory use is about 6x `--mb`, so keep `--mb` at or below 1024 on a 16 GB machine.
 
-## Status (proof of concept)
+## How the native library gets into your app
+
+Released versions download a prebuilt library for your target from this
+repo's GitHub Releases and check its SHA-256 against the hash shipped in
+`hook/prebuilt.dart`, so app developers don't need Rust. Targets: Android
+(arm64, armv7, x86_64), iOS (device, simulator arm64 and x86_64), macOS
+(arm64, x86_64), Linux (x64, arm64) and Windows (x64, arm64). Web uses the
+embedded WebAssembly build.
+
+To build from source instead (needs Rust and `rustup target add <triple>`),
+add to your app's `pubspec.yaml`:
+
+```yaml
+hooks:
+  user_defines:
+    rapid_archive:
+      from_source: true
+```
+
+Releasing: push a tag like `v0.1.0`. `.github/workflows/release.yml` builds
+every target and attaches the binaries plus `SHA256SUMS` to the release. Then
+run `dart run tool/update_prebuilt.dart v0.1.0` and commit `hook/prebuilt.dart`.
+
+## Status
 
 - Done: gzip, zlib and raw deflate; parallel gzip/zlib; zip create and extract;
-  build hook for all native targets; interop tests both ways against
-  `package:archive`; zip-bomb and corruption checks.
-- Not yet: prebuilt binaries (right now app builds need a Rust toolchain),
-  Android/iOS device testing, web (WASM), zip64 writing (over 4 GB or 65,535
-  entries), streaming and file APIs, tar/bzip2/xz/zstd, and an
-  `Isolate.run` helper for large inputs on the UI isolate.
-- Native library size: about 790 KB on linux x64. Not yet measured for
-  Android and iOS.
+  interop tests both ways against `package:archive`; zip-bomb and corruption
+  checks; web via WebAssembly; tested on Android (emulator), iOS (simulator,
+  device build) and macOS; prebuilt binaries via GitHub Actions.
+- Not yet: testing on a physical phone, zip64 writing (over 4 GB or 65,535
+  entries), streaming and file APIs, tar/bzip2/xz/zstd.
+- Native library size: about 790 KB on linux x64, 668 KB on Android arm64.

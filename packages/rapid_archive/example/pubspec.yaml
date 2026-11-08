@@ -15,3 +15,9 @@ dependencies:
 
 flutter:
   uses-material-design: true
+
+# The example tests the code in this checkout, so build Rust from source.
+hooks:
+  user_defines:
+    rapid_archive:
+      from_source: true

@@ -1,0 +1,113 @@
+# Builds the native library for every platform and attaches the binaries plus
+# SHA256SUMS to a GitHub Release. Trigger by pushing a tag like v0.1.0, then
+# run `dart run tool/update_prebuilt.dart v0.1.0` in packages/rapid_archive so
+# the build hook downloads (and verifies) these binaries instead of needing Rust.
+
+name: Release native libraries
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create or update (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CRATE: packages/rapid_archive/native
+  MACOSX_DEPLOYMENT_TARGET: '10.15'
+  IPHONEOS_DEPLOYMENT_TARGET: '13.0'
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, lib: librapid_archive.so }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, lib: librapid_archive.so }
+          - { os: ubuntu-24.04, target: aarch64-linux-android, lib: librapid_archive.so, android: aarch64-linux-android }
+          - { os: ubuntu-24.04, target: armv7-linux-androideabi, lib: librapid_archive.so, android: armv7a-linux-androideabi }
+          - { os: ubuntu-24.04, target: x86_64-linux-android, lib: librapid_archive.so, android: x86_64-linux-android }
+          - { os: macos-15, target: aarch64-apple-darwin, lib: librapid_archive.dylib, sdk: macosx }
+          - { os: macos-15, target: x86_64-apple-darwin, lib: librapid_archive.dylib, sdk: macosx }
+          - { os: macos-15, target: aarch64-apple-ios, lib: librapid_archive.dylib, sdk: iphoneos }
+          - { os: macos-15, target: aarch64-apple-ios-sim, lib: librapid_archive.dylib, sdk: iphonesimulator }
+          - { os: macos-15, target: x86_64-apple-ios, lib: librapid_archive.dylib, sdk: iphonesimulator }
+          - { os: windows-2025, target: x86_64-pc-windows-msvc, lib: rapid_archive.dll }
+          - { os: windows-11-arm, target: aarch64-pc-windows-msvc, lib: rapid_archive.dll }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Android NDK toolchain
+        if: matrix.android
+        shell: bash
+        run: |
+          BIN="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          T=$(echo "${{ matrix.target }}" | tr 'a-z-' 'A-Z_')
+          U=$(echo "${{ matrix.target }}" | tr '-' '_')
+          CC="$BIN/${{ matrix.android }}21-clang"
+          {
+            echo "CARGO_TARGET_${T}_LINKER=$CC"
+            echo "CC_${U}=$CC"
+            echo "AR_${U}=$BIN/llvm-ar"
+            # 16 KB page alignment, required by Google Play for Android 15+.
+            echo "CARGO_TARGET_${T}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
+          } >> "$GITHUB_ENV"
+
+      - name: Apple SDK
+        if: matrix.sdk
+        run: echo "SDKROOT=$(xcrun --sdk ${{ matrix.sdk }} --show-sdk-path)" >> "$GITHUB_ENV"
+
+      - name: Build
+        shell: bash
+        run: cargo build --release --target ${{ matrix.target }} --manifest-path $CRATE/Cargo.toml
+
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir -p out
+          cp "$CRATE/target/${{ matrix.target }}/release/${{ matrix.lib }}" \
+             "out/${{ matrix.target }}-${{ matrix.lib }}"
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out/*
+
+  release:
+    needs: build
+    # Publish whatever built: a target missing from the release simply falls
+    # back to building with cargo in the hook.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" dist/* -R "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "rapid_archive $TAG" \
+              --notes "Prebuilt native libraries for rapid_archive $TAG. Verified by SHA-256 in the build hook."
+          fi

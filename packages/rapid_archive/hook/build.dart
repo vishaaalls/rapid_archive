@@ -3,14 +3,24 @@
 // `@Native` functions in lib/src/bindings.dart resolve to it.
 //
 // Runs automatically on `dart run`, `dart test`, `flutter run` and
-// `flutter build`. Needs a Rust toolchain plus the target installed
-// (`rustup target add <triple>`). Published releases will ship prebuilt
-// binaries so app developers don't need Rust.
+// `flutter build`. Released versions download a prebuilt, checksum-verified
+// library from GitHub Releases (see hook/prebuilt.dart), so app developers
+// don't need Rust. Without a prebuilt binary it builds with cargo, which
+// needs Rust plus the target (`rustup target add <triple>`). To force a
+// source build, add this to the app's pubspec.yaml:
+//
+//   hooks:
+//     user_defines:
+//       rapid_archive:
+//         from_source: true
 
 import 'dart:io';
 
 import 'package:code_assets/code_assets.dart';
+import 'package:crypto/crypto.dart';
 import 'package:hooks/hooks.dart';
+
+import 'prebuilt.dart';
 
 const _crate = 'rapid_archive';
 
@@ -99,6 +109,88 @@ String _cargo() {
   return local != null && local.existsSync() ? local.path : 'cargo';
 }
 
+/// Downloads the prebuilt library for [triple] from the GitHub release that
+/// matches this package version, verifies its SHA-256 against the hash
+/// shipped in hook/prebuilt.dart, and caches it. Returns null when there is
+/// no prebuilt binary for this target (then we build with cargo).
+Future<Uri?> _prebuilt(BuildInput input, String triple, String libName) async {
+  final hash = prebuiltHashes['$triple/$libName'];
+  if (hash == null || prebuiltVersion.isEmpty) return null;
+  final asset = '$triple-$libName';
+  final dir = Directory.fromUri(
+      input.outputDirectoryShared.resolve('prebuilt/$prebuiltVersion/'));
+  final file = File('${dir.path}$asset');
+  if (file.existsSync() && _sha256(file.readAsBytesSync()) == hash) {
+    return file.uri;
+  }
+  // `prebuilt_url` (a user-define) points at a mirror, or a local server in tests.
+  final base = input.userDefines['prebuilt_url'] as String? ?? prebuiltBaseUrl;
+  final url = Uri.parse('$base/$prebuiltVersion/$asset');
+  final client = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 30)
+    ..findProxy = HttpClient.findProxyFromEnvironment;
+  try {
+    final req = await client.getUrl(url);
+    final res = await req.close();
+    if (res.statusCode != 200) {
+      throw HttpException('HTTP ${res.statusCode}', uri: url);
+    }
+    final bytes = <int>[];
+    await for (final chunk in res) {
+      bytes.addAll(chunk);
+    }
+    final got = _sha256(bytes);
+    if (got != hash) {
+      throw Exception('Checksum mismatch for $url: expected $hash, got $got');
+    }
+    dir.createSync(recursive: true);
+    final tmp = File('${file.path}.tmp')..writeAsBytesSync(bytes);
+    tmp.renameSync(file.path);
+    return file.uri;
+  } finally {
+    client.close();
+  }
+}
+
+String _sha256(List<int> bytes) => sha256.convert(bytes).toString();
+
+bool _hasCargo() {
+  try {
+    return Process.runSync(_cargo(), ['--version']).exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
+}
+
+Future<Uri> _cargoBuild(
+    BuildInput input, CodeConfig code, String triple, String libName) async {
+  final crateDir = input.packageRoot.resolve('native/');
+  final targetDir = input.outputDirectoryShared.resolve('cargo/');
+  final result = await Process.run(
+    _cargo(),
+    [
+      'build',
+      '--release',
+      '--target',
+      triple,
+      '--manifest-path',
+      crateDir.resolve('Cargo.toml').toFilePath(),
+      '--target-dir',
+      targetDir.toFilePath(),
+    ],
+    environment: _toolchainEnv(code, triple),
+  );
+  if (result.exitCode != 0) {
+    final err = result.stderr as String;
+    if (err.contains('target may not be installed')) {
+      throw Exception('The Rust target $triple is not installed. Run:\n'
+          '  rustup target add $triple');
+    }
+    throw Exception('cargo build failed for $triple:\n$err');
+  }
+  return targetDir.resolve('$triple/release/$libName');
+}
+
 void main(List<String> args) async {
   await build(args, (input, output) async {
     if (!input.config.buildCodeAssets) return;
@@ -109,50 +201,49 @@ void main(List<String> args) async {
     // platform (it wraps them in a framework on iOS); some setups ask for
     // static linking instead.
     final static = code.linkModePreference == LinkModePreference.static;
-
-    final crateDir = input.packageRoot.resolve('native/');
-    final targetDir = input.outputDirectoryShared.resolve('cargo/');
-    final result = await Process.run(
-      _cargo(),
-      [
-        'build',
-        '--release',
-        '--target',
-        triple,
-        '--manifest-path',
-        crateDir.resolve('Cargo.toml').toFilePath(),
-        '--target-dir',
-        targetDir.toFilePath(),
-      ],
-      environment: _toolchainEnv(code, triple),
-    );
-    if (result.exitCode != 0) {
-      final err = result.stderr as String;
-      if (err.contains('target may not be installed')) {
-        throw Exception('The Rust target $triple is not installed. Run:\n'
-            '  rustup target add $triple');
-      }
-      throw Exception('cargo build failed for $triple:\n$err');
-    }
-
     final libName =
         static ? os.staticlibFileName(_crate) : os.dylibFileName(_crate);
-    final lib = targetDir.resolve('$triple/release/$libName');
+
+    // Order: the `from_source: true` user-define forces cargo. Otherwise use the
+    // verified prebuilt binary when one exists, and fall back to cargo.
+    final crateDir = input.packageRoot.resolve('native/');
+    final fromSource = input.userDefines['from_source'] == true;
+    Uri? lib;
+    if (!fromSource) {
+      try {
+        lib = await _prebuilt(input, triple, libName);
+      } catch (e) {
+        if (!_hasCargo()) {
+          throw Exception('Could not download the prebuilt rapid_archive '
+              'library ($e), and Rust is not installed to build it.');
+        }
+        stderr.writeln('rapid_archive: prebuilt download failed ($e); '
+            'building with cargo.');
+      }
+    }
+    if (lib == null) {
+      if (!_hasCargo()) {
+        throw Exception('rapid_archive has no prebuilt library for $triple. '
+            'Install Rust (https://rustup.rs) and run: rustup target add $triple');
+      }
+      lib = await _cargoBuild(input, code, triple, libName);
+      // Rebuild when Rust sources change.
+      output.dependencies.addAll([
+        crateDir.resolve('Cargo.toml'),
+        crateDir.resolve('Cargo.lock'),
+        for (final f in Directory.fromUri(crateDir.resolve('src/'))
+            .listSync(recursive: true)
+            .whereType<File>())
+          f.uri,
+      ]);
+    }
+    output.dependencies.add(input.packageRoot.resolve('hook/prebuilt.dart'));
+
     output.assets.code.add(CodeAsset(
       package: input.packageName,
       name: 'src/bindings_ffi.dart',
       linkMode: static ? StaticLinking() : DynamicLoadingBundled(),
       file: lib,
     ));
-
-    // Rebuild when Rust sources change.
-    output.dependencies.addAll([
-      crateDir.resolve('Cargo.toml'),
-      crateDir.resolve('Cargo.lock'),
-      for (final f in Directory.fromUri(crateDir.resolve('src/'))
-          .listSync(recursive: true)
-          .whereType<File>())
-        f.uri,
-    ]);
   });
 }
