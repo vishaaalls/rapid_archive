@@ -39,7 +39,19 @@ class BenchPage extends StatefulWidget {
 class _BenchPageState extends State<BenchPage> {
   final rows = <Row3>[];
   bool busy = false;
-  int mb = 32;
+  // `flutter run --release --dart-define=AUTORUN=true --dart-define=MB=128`
+  // starts the benchmark on launch and prints BENCH lines, handy for CI or a
+  // headless check.
+  int mb = const int.fromEnvironment('MB', defaultValue: 32);
+
+  @override
+  void initState() {
+    super.initState();
+    if (const bool.fromEnvironment('AUTORUN')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => run());
+    }
+  }
+
   String status = 'Tap Run to compare on this device.';
 
   Future<void> run() async {
@@ -73,7 +85,7 @@ class _BenchPageState extends State<BenchPage> {
             const Text('Input size: '),
             DropdownButton<int>(
               value: mb,
-              items: [8, 32, 64, 128]
+              items: {8, 32, 64, 128, mb}
                   .map((v) => DropdownMenuItem(value: v, child: Text('$v MB')))
                   .toList(),
               onChanged: busy ? null : (v) => setState(() => mb = v!),
