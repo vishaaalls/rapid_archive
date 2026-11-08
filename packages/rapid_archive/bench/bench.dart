@@ -123,7 +123,8 @@ void main(List<String> args) {
 
   // Zip: many small files (typical "zip a folder of JSON/logs/assets").
   for (final (label, n, size) in [
-    ('${size * 128} files x 8 KB', size * 128, 8 * 1024),
+    // Capped below 65,535 entries: zip64 writing isn't supported yet.
+    ('${min(size * 128, 60000)} files x 8 KB', min(size * 128, 60000), 8 * 1024),
     ('8 files x ${size ~/ 4} MB', 8, (size ~/ 4) * mb),
   ]) {
     final archive = ref.Archive();

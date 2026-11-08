@@ -15,6 +15,23 @@ final files = const ZipDecoder().decodeBytes(zipBytes).files; // parallel extrac
 
 ## Benchmarks
 
+### MacBook Air M4 (10 cores), 256 MB inputs
+
+| Operation | archive | rapid_archive | Speedup |
+|---|---|---|---|
+| gzip compress, JSON | 3357 ms | 1991 ms | **1.7x** (output 2% smaller) |
+| gzip compress, JSON, `parallel: true` | 3463 ms | 371 ms | **9.3x** |
+| gzip decompress, JSON | 323 ms | 189 ms | **1.7x** |
+| gzip decompress, random | 52 ms | 14 ms | **3.7x** |
+| zip create, 32,768 x 8 KB | 1216 ms | 299 ms | **4.1x** |
+| zip extract all, 32,768 x 8 KB | 569 ms | 58 ms | **9.9x** |
+| zip create, 8 x 64 MB | 1990 ms | 803 ms | **2.5x** |
+| zip extract all, 8 x 64 MB | 702 ms | 145 ms | **4.9x** |
+
+At 512 MB, parallel gzip compress was 9.1x faster (6.9 s down to 0.74 s).
+
+### Linux x64 (4 cores), 16 MB inputs
+
 16 MB inputs on a 4-core x86_64 Linux box, Dart 3.13 AOT, median of 7 runs.
 `package:archive` 4.6 already uses the C zlib inside `dart:io` on mobile and
 desktop. Its pure-Dart path is what Flutter **web** runs.
