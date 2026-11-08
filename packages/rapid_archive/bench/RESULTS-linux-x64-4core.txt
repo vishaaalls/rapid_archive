@@ -1,0 +1,15 @@
+op | data | archive (native zlib) | archive (pure Dart, = web) | rapid_archive | vs archive | vs pure Dart
+gzip compress | 16 MB JSON | 426.0 ms | 999.5 ms | 220.2 ms | 1.9x | 5x
+gzip compress (parallel) | 16 MB JSON | 415.3 ms | - | 87.6 ms | 4.7x | -
+   output size: archive 4159623 B, rapid 4062850 B, rapid parallel 4384280 B
+gzip decompress | 16 MB JSON | 42.6 ms | 118.7 ms | 22.6 ms | 1.9x | 5x
+gzip compress | 16 MB random | 358.9 ms | - | 210.2 ms | 1.7x | -
+gzip compress (parallel) | 16 MB random | 367.2 ms | - | 97.3 ms | 3.8x | -
+   output size: archive 16782359 B, rapid 16778634 B, rapid parallel 16782507 B
+gzip decompress | 16 MB random | 13.0 ms | - | 4.1 ms | 3.2x | -
+zip create | 2000 files x 8 KB | 197.3 ms | - | 57.0 ms | 3.5x | -
+zip extract all | 2000 files x 8 KB | 73.0 ms | - | 13.0 ms | 5.6x | -
+zip create | 8 files x 4 MB | 254.8 ms | - | 153.2 ms | 1.7x | -
+zip extract all | 8 files x 4 MB | 111.2 ms | - | 18.6 ms | 6.0x | -
+
+CPU cores: 4, linux 3.13.7

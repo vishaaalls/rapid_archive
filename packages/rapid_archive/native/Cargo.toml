@@ -1,0 +1,26 @@
+[package]
+name = "rapid_archive"
+version = "0.1.0"
+edition = "2024"
+description = "Rust core for the rapid_archive Flutter/Dart package: fast gzip and zip."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
+zip = { version = "9.4", default-features = false }
+rayon = "1.10"
+crc32fast = "1.4"
+libdeflate-sys = "1.26"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+zip = { version = "9.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
