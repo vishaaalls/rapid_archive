@@ -175,76 +175,76 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
       <header>
         <div>
           <h3>gzip decompress</h3>
-          <p class="meta">sample orders.json · 32.0 MB</p>
+          <p class="meta">sample orders.json · 32 MB</p>
         </div>
         <div class="speedup win">
-          <strong>8.7×</strong>
+          <strong>9.3×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">643 ms<small>50 MB/s</small></span>
+        <span class="bar-value">888 ms<small>36 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:11.5%"></span></span>
-        <span class="bar-value">74 ms<small>434 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:10.7%"></span></span>
+        <span class="bar-value">95 ms<small>337 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">Browser built-in</span>
-        <span class="bar-track"><span class="bar browser" style="width:18.2%"></span></span>
-        <span class="bar-value">117 ms<small>273 MB/s</small></span>
+        <span class="bar-track"><span class="bar browser" style="width:14.2%"></span></span>
+        <span class="bar-value">126 ms<small>254 MB/s</small></span>
       </div>
       <p class="check ok">Output verified byte for byte</p>
     </article>    <article class="result">
       <header>
         <div>
           <h3>gzip compress</h3>
-          <p class="meta">sample orders.json · 32.0 MB · output 6.7 MB vs 6.1 MB</p>
+          <p class="meta">sample orders.json · 32 MB · output 6.7 MB vs 6.1 MB</p>
         </div>
         <div class="speedup win">
-          <strong>4.4×</strong>
+          <strong>4.5×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">2.35 s<small>14 MB/s</small></span>
+        <span class="bar-value">2.66 s<small>12 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:22.9%"></span></span>
-        <span class="bar-value">537 ms<small>60 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:22.2%"></span></span>
+        <span class="bar-value">591 ms<small>54 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">Browser built-in</span>
-        <span class="bar-track"><span class="bar browser" style="width:28.4%"></span></span>
-        <span class="bar-value">668 ms<small>48 MB/s</small></span>
+        <span class="bar-track"><span class="bar browser" style="width:25.0%"></span></span>
+        <span class="bar-value">667 ms<small>48 MB/s</small></span>
       </div>
       <p class="check ok">Output verified byte for byte</p>
     </article>    <article class="result">
       <header>
         <div>
           <h3>zip create</h3>
-          <p class="meta">sample orders.zip · 31.3 MB · 2000 files</p>
+          <p class="meta">sample orders.zip · 31 MB · 2000 files</p>
         </div>
         <div class="speedup win">
-          <strong>3.7×</strong>
+          <strong>4.6×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">1.60 s<small>20 MB/s</small></span>
+        <span class="bar-value">2.03 s<small>15 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:27.0%"></span></span>
-        <span class="bar-value">430 ms<small>73 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:21.8%"></span></span>
+        <span class="bar-value">443 ms<small>71 MB/s</small></span>
       </div>
       
       <p class="check ok">Output verified byte for byte</p>
@@ -252,22 +252,22 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
       <header>
         <div>
           <h3>zip extract</h3>
-          <p class="meta">sample orders.zip · 31.3 MB · 2000 files, 31.3 MB unpacked</p>
+          <p class="meta">sample orders.zip · 31 MB · 2000 files, 31 MB unpacked</p>
         </div>
         <div class="speedup win">
-          <strong>6.7×</strong>
+          <strong>5.4×</strong>
           <span>faster than archive</span>
         </div>
       </header>
             <div class="bar-row">
         <span class="bar-label">archive (Dart)</span>
         <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
-        <span class="bar-value">619 ms<small>50 MB/s</small></span>
+        <span class="bar-value">724 ms<small>43 MB/s</small></span>
       </div>
             <div class="bar-row">
         <span class="bar-label">rapid_archive (Rust)</span>
-        <span class="bar-track"><span class="bar rapid" style="width:15.0%"></span></span>
-        <span class="bar-value">93 ms<small>336 MB/s</small></span>
+        <span class="bar-track"><span class="bar rapid" style="width:18.4%"></span></span>
+        <span class="bar-value">133 ms<small>235 MB/s</small></span>
       </div>
       
       <p class="check ok">Output verified byte for byte</p>
