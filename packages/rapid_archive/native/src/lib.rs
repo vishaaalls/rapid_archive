@@ -10,6 +10,8 @@
 //!   native finalizers require).
 
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::ffi::c_char;
 use rayon::prelude::*;
 
@@ -21,22 +23,26 @@ use codec::Fmt;
 // ---------------------------------------------------------------------------
 // Owned buffers
 // ---------------------------------------------------------------------------
+//
+// Results are Rust `Vec`s handed to Dart as-is (no copy). Dart's native
+// finalizer only gives us back the pointer, so we remember each live
+// buffer's length and capacity here and rebuild the Vec in `ra_free`.
 
-const HDR: usize = 8;
+static LIVE: Mutex<Option<HashMap<usize, (usize, usize, bool)>>> = Mutex::new(None);
 
-/// Allocates `len` bytes (plus header) and returns a pointer to the payload.
-/// The payload is zero-initialised.
-fn alloc_buf(len: usize) -> *mut u8 {
-    let mut b = vec![0u8; HDR + len].into_boxed_slice();
-    b[..HDR].copy_from_slice(&(len as u64).to_le_bytes());
-    let p = Box::into_raw(b) as *mut u8;
-    unsafe { p.add(HDR) }
+/// Hands a Vec to the caller without copying it.
+fn give(v: Vec<u8>) -> (*mut u8, usize) {
+    let mut v = std::mem::ManuallyDrop::new(v);
+    let (p, len, cap) = (v.as_mut_ptr(), v.len(), v.capacity());
+    LIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(p as usize, (len, cap, false));
+    (p, len)
 }
 
-/// Copies bytes into an owned buffer. One memcpy; cheap next to compression.
-fn vec_to_buf(v: &[u8]) -> *mut u8 {
-    let p = alloc_buf(v.len());
-    unsafe { std::ptr::copy_nonoverlapping(v.as_ptr(), p, v.len()) };
+/// Same as [`give`] for a `u64` table (keeps 8-byte alignment).
+fn give_u64(v: Vec<u64>) -> *mut u64 {
+    let mut v = std::mem::ManuallyDrop::new(v);
+    let (p, len, cap) = (v.as_mut_ptr(), v.len(), v.capacity());
+    LIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(p as usize, (len, cap, true));
     p
 }
 
@@ -46,13 +52,11 @@ pub unsafe extern "C" fn ra_free(p: *mut u8) {
     if p.is_null() {
         return;
     }
-    unsafe {
-        let base = p.sub(HDR);
-        let mut hdr = [0u8; HDR];
-        std::ptr::copy_nonoverlapping(base, hdr.as_mut_ptr(), HDR);
-        let len = u64::from_le_bytes(hdr) as usize;
-        let slice = std::ptr::slice_from_raw_parts_mut(base, HDR + len);
-        drop(Box::from_raw(slice));
+    let entry = LIVE.lock().unwrap().as_mut().and_then(|m| m.remove(&(p as usize)));
+    match entry {
+        Some((len, cap, false)) => drop(unsafe { Vec::from_raw_parts(p, len, cap) }),
+        Some((len, cap, true)) => drop(unsafe { Vec::from_raw_parts(p as *mut u64, len, cap) }),
+        None => {}
     }
 }
 
@@ -93,9 +97,10 @@ fn level(l: i32) -> u32 {
 }
 
 fn emit(out: *mut *mut u8, out_len: *mut usize, v: Vec<u8>) -> i32 {
+    let (p, len) = give(v);
     unsafe {
-        *out_len = v.len();
-        *out = vec_to_buf(&v);
+        *out = p;
+        *out_len = len;
     }
     0
 }
@@ -293,8 +298,9 @@ fn zip_decode(data: &[u8]) -> Result<RaZip, String> {
 
     // Pass 2: inflate every entry straight into its place, in parallel.
     let total = total as usize;
-    let out = alloc_buf(total);
-    let out_slice: &mut [u8] = unsafe { std::slice::from_raw_parts_mut(out, total) };
+    // Zeroed allocation: large ones come straight from the OS as zero pages.
+    let mut out_vec = vec![0u8; total];
+    let out_slice: &mut [u8] = &mut out_vec;
     let mut work: Vec<(usize, &Slot, &mut [u8])> = Vec::with_capacity(n);
     let mut rest = out_slice;
     for (i, s) in sizes.iter().enumerate() {
@@ -320,20 +326,18 @@ fn zip_decode(data: &[u8]) -> Result<RaZip, String> {
         }
         Ok(())
     });
-    if let Err(e) = result {
-        unsafe { ra_free(out) };
-        return Err(e);
-    }
+    result?;
 
-    let names_buf = vec_to_buf(&names);
-    let table_bytes: Vec<u8> = table.iter().flat_map(|x| x.to_le_bytes()).collect();
-    let table_buf = vec_to_buf(&table_bytes) as *mut u64;
+    let (out, _) = give(out_vec);
+    let names_len = names.len();
+    let (names_buf, _) = give(names);
+    let table_buf = give_u64(table);
     Ok(RaZip {
         count: n,
         data: out,
         data_len: total,
         names: names_buf,
-        names_len: names.len(),
+        names_len,
         table: table_buf,
     })
 }

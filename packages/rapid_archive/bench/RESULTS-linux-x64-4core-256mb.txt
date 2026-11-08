@@ -1,0 +1,16 @@
+Generating 256 MB test inputs...
+op | data | archive (native zlib) | archive (pure Dart, = web) | rapid_archive | vs archive | vs pure Dart
+gzip compress | 256 MB JSON | 6855.4 ms | - | 3502.0 ms | 2.0x | -
+gzip compress (parallel) | 256 MB JSON | 6966.1 ms | - | 1344.0 ms | 5.2x | -
+   output size: archive 65300378 B, rapid 63693519 B, rapid parallel 68959380 B
+gzip decompress | 256 MB JSON | 671.4 ms | - | 430.2 ms | 1.6x | -
+gzip compress | 256 MB random | 5760.0 ms | - | 3477.2 ms | 1.7x | -
+gzip compress (parallel) | 256 MB random | 6140.0 ms | - | 1712.4 ms | 3.6x | -
+   output size: archive 268517399 B, rapid 268457844 B, rapid parallel 268519813 B
+gzip decompress | 256 MB random | 356.4 ms | - | 175.8 ms | 2.0x | -
+zip create | 32768 files x 8 KB | 3284.0 ms | - | 939.9 ms | 3.5x | -
+zip extract all | 32768 files x 8 KB | 1263.5 ms | - | 186.5 ms | 6.8x | -
+zip create | 8 files x 64 MB | 4307.0 ms | - | 2176.9 ms | 2.0x | -
+zip extract all | 8 files x 64 MB | 1621.5 ms | - | 283.5 ms | 5.7x | -
+
+CPU cores: 4, linux 3.13.7

@@ -34,7 +34,22 @@ desktop. Its pure-Dart path is what Flutter **web** runs.
 Phones have 6 to 8 cores, so the parallel numbers should scale further. They
 still need measuring on real devices.
 
-Reproduce: `dart build cli -t bench/bench.dart && build/cli/linux_x64/bundle/bin/bench`
+At 256 MB the gap holds or widens: gzip 2x (5.2x parallel), zip extract 5.7 to 6.8x
+(see `bench/RESULTS-linux-x64-4core-256mb.txt`).
+
+### Run it yourself (macOS / Linux)
+
+```sh
+curl https://sh.rustup.rs -sSf | sh     # Rust, once
+brew install dart                       # or use the dart that ships with Flutter 3.38+
+cd packages/rapid_archive
+bench/run.sh --mb 512 --runs 3          # 512 MB inputs
+bench/run.sh --mb 64 --file ~/Downloads/some-big-file.mov
+```
+
+Options: `--mb N` input size, `--runs N` timed runs (median), `--file PATH` add
+one of your own files, `--pure` also time the pure-Dart (web) codec.
+Memory use is about 6x `--mb`, so keep `--mb` at or below 1024 on a 16 GB machine.
 
 ## Status (proof of concept)
 

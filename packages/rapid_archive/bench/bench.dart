@@ -5,6 +5,12 @@
 // / GZipDecoderWeb) is what Flutter web runs, so it's measured too.
 //
 // Run: dart build cli -t bench/bench.dart && ./build/cli/<os>_<arch>/bundle/bin/bench
+//
+// Options:
+//   --mb N       size of each test input in MB (default 16)
+//   --runs N     timed runs per measurement, median reported (default 7)
+//   --file PATH  also gzip/gunzip one of your own files
+//   --pure       also time archive's pure-Dart (web) codec; slow on big inputs
 
 import 'dart:convert';
 import 'dart:io';
@@ -14,7 +20,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart' as ref;
 import 'package:rapid_archive/rapid_archive.dart' as rapid;
 
-const runs = 7;
+var runs = 7;
 
 double timeMs(void Function() f) {
   f();
@@ -62,22 +68,37 @@ void row(String op, String data, double refMs, double rapidMs,
   stdout.writeln(rows.last.join(' | '));
 }
 
-void main() {
+String? _opt(List<String> args, String name) {
+  final i = args.indexOf(name);
+  return i >= 0 && i + 1 < args.length ? args[i + 1] : null;
+}
+
+void main(List<String> args) {
+  final size = int.parse(_opt(args, '--mb') ?? '16');
+  runs = int.parse(_opt(args, '--runs') ?? '7');
+  final file = _opt(args, '--file');
+  final withPure = args.contains('--pure') || size <= 16;
   final r = Random(42);
   const mb = 1024 * 1024;
-  final text = jsonLike(16 * mb, r);
-  final noise = random(16 * mb, r);
+  stdout.writeln('Generating ${size} MB test inputs...');
+  final text = jsonLike(size * mb, r);
+  final noise = random(size * mb, r);
 
   stdout.writeln('op | data | archive (native zlib) | archive (pure Dart, = web) '
       '| rapid_archive | vs archive | vs pure Dart');
 
-  for (final (label, data) in [('16 MB JSON', text), ('16 MB random', noise)]) {
+  final inputs = [('$size MB JSON', text), ('$size MB random', noise)];
+  if (file != null) {
+    final f = File(file).readAsBytesSync();
+    inputs.add(('${file.split('/').last} (${f.length ~/ mb} MB)', f));
+  }
+  for (final (label, data) in inputs) {
     final refGz = ref.GZipEncoder().encodeBytes(data);
     final rapidGz = const rapid.GZipEncoder().encodeBytes(data);
     // Sanity: each side can read the other's output.
     assert(rapid.GZipDecoder().decodeBytes(refGz).length == data.length);
 
-    final pure = label.contains('JSON')
+    final pure = withPure && label.contains('JSON')
         ? timeMs(() => ref.GZipEncoderWeb().encodeBytes(data))
         : null;
     row('gzip compress', label,
@@ -91,7 +112,7 @@ void main() {
     stdout.writeln('   output size: archive ${refGz.length} B, rapid '
         '${rapidGz.length} B, rapid parallel ${parGz.length} B');
 
-    final pureD = label.contains('JSON')
+    final pureD = withPure && label.contains('JSON')
         ? timeMs(() => ref.GZipDecoderWeb().decodeBytes(refGz))
         : null;
     row('gzip decompress', label,
@@ -102,8 +123,8 @@ void main() {
 
   // Zip: many small files (typical "zip a folder of JSON/logs/assets").
   for (final (label, n, size) in [
-    ('2000 files x 8 KB', 2000, 8 * 1024),
-    ('8 files x 4 MB', 8, 4 * mb),
+    ('${size * 128} files x 8 KB', size * 128, 8 * 1024),
+    ('8 files x ${size ~/ 4} MB', 8, (size ~/ 4) * mb),
   ]) {
     final archive = ref.Archive();
     for (var i = 0; i < n; i++) {
