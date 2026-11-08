@@ -16,6 +16,7 @@ use std::ffi::c_char;
 use rayon::prelude::*;
 
 mod codec;
+mod zipread;
 mod zipwrite;
 
 use codec::Fmt;
@@ -44,6 +45,23 @@ fn give_u64(v: Vec<u64>) -> *mut u64 {
     let (p, len, cap) = (v.as_mut_ptr(), v.len(), v.capacity());
     LIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(p as usize, (len, cap, true));
     p
+}
+
+/// Allocates `len` bytes for the caller to fill with input (used by the
+/// WebAssembly build, where JS must copy data into wasm memory first).
+/// Release with `ra_input_free(ptr, len)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ra_input_alloc(len: usize) -> *mut u8 {
+    let mut v = std::mem::ManuallyDrop::new(Vec::<u8>::with_capacity(len.max(1)));
+    v.as_mut_ptr()
+}
+
+/// Frees a buffer from `ra_input_alloc`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_input_free(p: *mut u8, len: usize) {
+    if !p.is_null() {
+        drop(unsafe { Vec::from_raw_parts(p, 0, len.max(1)) });
+    }
 }
 
 /// Frees a buffer returned by any `ra_*` function. Null is a no-op.
@@ -181,11 +199,10 @@ pub unsafe extern "C" fn ra_zip_encode(
 ) -> i32 {
     let names = unsafe { slice(names, names_len) };
     let blob = unsafe { slice(blob, blob_len) };
-    let table = if count == 0 {
-        &[][..]
-    } else {
-        unsafe { std::slice::from_raw_parts(table, count * 5) }
-    };
+    // read_unaligned: on WebAssembly the table arrives in a byte buffer.
+    let table: Vec<u64> = (0..count * 5)
+        .map(|i| unsafe { std::ptr::read_unaligned(table.add(i)) })
+        .collect();
     let mut entries = Vec::with_capacity(count);
     for row in table.chunks_exact(5) {
         let [no, nl, d_off, dl, flags] = [row[0], row[1], row[2], row[3], row[4]].map(|x| x as usize);
@@ -245,47 +262,43 @@ struct Slot {
 }
 
 fn zip_decode(data: &[u8]) -> Result<RaZip, String> {
-    let mut archive =
-        zip::ZipArchive::new(std::io::Cursor::new(data)).map_err(|e| e.to_string())?;
-    let n = archive.len();
+    let entries = zipread::read(data)?;
+    let n = entries.len();
 
-    // Pass 1: read the directory and local headers (no decompression).
+    // Pass 1: validate entries and lay out the output buffer.
     let mut names = Vec::new();
     let mut table = Vec::with_capacity(n * 5);
     let mut total: u64 = 0;
     let mut slots = Vec::with_capacity(n);
     let mut sizes = Vec::with_capacity(n);
-    for i in 0..n {
-        let f = archive.by_index_raw(i).map_err(|e| e.to_string())?;
-        let name = f.name().map_err(|e| e.to_string())?.into_owned();
-        let dir = f.is_dir();
-        let size = if dir { 0 } else { f.size() };
-        if !dir && size > 0 {
-            if f.encrypted() {
-                return Err(format!("{name}: encrypted entries are not supported"));
+    for e in &entries {
+        let size = if e.dir { 0 } else { e.size };
+        if !e.dir && size > 0 {
+            if e.encrypted {
+                return Err(format!("{}: encrypted entries are not supported", e.name));
             }
-            let deflated = match f.compression() {
-                zip::CompressionMethod::Stored => false,
-                m if m == zip::CompressionMethod::DEFLATE => true,
-                m => return Err(format!("{name}: unsupported compression {m:?}")),
+            let deflated = match e.method {
+                0 => false,
+                8 => true,
+                m => return Err(format!("{}: unsupported compression method {m}", e.name)),
             };
-            let start = f.data_start().ok_or("missing data offset")? as usize;
-            let csize = f.compressed_size() as usize;
+            let start = usize::try_from(e.data_start).map_err(|_| "archive too large")?;
+            let csize = usize::try_from(e.csize).map_err(|_| "archive too large")?;
             if start.checked_add(csize).is_none_or(|end| end > data.len()) {
-                return Err(format!("{name}: data runs past end of archive"));
+                return Err(format!("{}: data runs past end of archive", e.name));
             }
-            slots.push(Some(Slot { start, csize, deflated, crc: f.crc32() }));
+            slots.push(Some(Slot { start, csize, deflated, crc: e.crc }));
         } else {
             slots.push(None);
         }
         table.extend_from_slice(&[
             names.len() as u64,
-            name.len() as u64,
+            e.name.len() as u64,
             total,
             size,
-            dir as u64,
+            e.dir as u64,
         ]);
-        names.extend_from_slice(name.as_bytes());
+        names.extend_from_slice(e.name.as_bytes());
         sizes.push(size as usize);
         total = total.checked_add(size).ok_or("archive too large")?;
     }

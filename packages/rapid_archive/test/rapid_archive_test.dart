@@ -12,6 +12,8 @@ Uint8List text(int n) {
 }
 
 void main() {
+  setUpAll(ensureRapidArchiveInitialized);
+
   test('gzip round trip and interop with package:archive', () {
     final d = text(200000);
     final ours = const GZipEncoder().encodeBytes(d);

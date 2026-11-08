@@ -72,7 +72,7 @@ void main(List<String> args) async {
     final lib = targetDir.resolve('$triple/release/$libName');
     output.assets.code.add(CodeAsset(
       package: input.packageName,
-      name: 'src/bindings.dart',
+      name: 'src/bindings_ffi.dart',
       linkMode: static ? StaticLinking() : DynamicLoadingBundled(),
       file: lib,
     ));

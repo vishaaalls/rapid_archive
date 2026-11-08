@@ -11,11 +11,14 @@
 
 #![allow(non_upper_case_globals)]
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::cell::RefCell;
 use std::io::Read;
+#[cfg(not(target_arch = "wasm32"))]
 use std::ptr::NonNull;
 
 use flate2::{Compress, Compression, FlushCompress};
+#[cfg(not(target_arch = "wasm32"))]
 use libdeflate_sys::*;
 use rayon::prelude::*;
 
@@ -30,27 +33,33 @@ pub enum Fmt {
 // Thread-local libdeflate state (a level-9 compressor is ~1 MiB to set up).
 // ---------------------------------------------------------------------------
 
+#[cfg(not(target_arch = "wasm32"))]
 struct Comp {
     level: i32,
     ptr: NonNull<libdeflate_compressor>,
 }
+#[cfg(not(target_arch = "wasm32"))]
 impl Drop for Comp {
     fn drop(&mut self) {
         unsafe { libdeflate_free_compressor(self.ptr.as_ptr()) }
     }
 }
+#[cfg(not(target_arch = "wasm32"))]
 struct Decomp(NonNull<libdeflate_decompressor>);
+#[cfg(not(target_arch = "wasm32"))]
 impl Drop for Decomp {
     fn drop(&mut self) {
         unsafe { libdeflate_free_decompressor(self.0.as_ptr()) }
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 thread_local! {
     static COMP: RefCell<Option<Comp>> = const { RefCell::new(None) };
     static DECOMP: RefCell<Option<Decomp>> = const { RefCell::new(None) };
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn with_comp<T>(level: i32, f: impl FnOnce(*mut libdeflate_compressor) -> T) -> T {
     COMP.with(|c| {
         let mut c = c.borrow_mut();
@@ -62,6 +71,7 @@ fn with_comp<T>(level: i32, f: impl FnOnce(*mut libdeflate_compressor) -> T) -> 
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn with_decomp<T>(f: impl FnOnce(*mut libdeflate_decompressor) -> T) -> T {
     DECOMP.with(|d| {
         let mut d = d.borrow_mut();
@@ -77,6 +87,7 @@ pub(crate) fn with_decomp<T>(f: impl FnOnce(*mut libdeflate_decompressor) -> T) 
 // Compression
 // ---------------------------------------------------------------------------
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Compresses with libdeflate. `level` 0..=9 like zlib.
 pub fn compress(f: Fmt, data: &[u8], level: u32) -> Vec<u8> {
     let level = level.min(9) as i32;
@@ -203,6 +214,7 @@ fn adler32(data: &[u8]) -> u32 {
 /// Hard cap on output we'll allocate in one go (zip-bomb protection).
 pub const MAX_OUT: usize = 2 << 30;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn decompress(f: Fmt, data: &[u8]) -> Result<Vec<u8>, String> {
     // gzip records the size (mod 2^32) in its trailer; for the others, start
     // at 4x and grow.
@@ -277,6 +289,7 @@ fn stream_decompress(f: Fmt, data: &[u8]) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Raw-deflate decompress into an exactly sized slot (zip entries).
 pub fn inflate_exact(src: &[u8], dst: &mut [u8]) -> Result<(), String> {
     let mut used_out = 0usize;
@@ -297,6 +310,50 @@ pub fn inflate_exact(src: &[u8], dst: &mut [u8]) -> Result<(), String> {
             Err("larger than its declared size".into())
         }
         _ => Err("corrupt deflate data".into()),
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// WebAssembly: libdeflate is C and needs a libc, so on wasm32 the same API is
+// served by zlib-rs (pure Rust).
+// ---------------------------------------------------------------------------
+
+#[cfg(target_arch = "wasm32")]
+pub fn compress(f: Fmt, data: &[u8], level: u32) -> Vec<u8> {
+    use std::io::Write;
+    let lvl = Compression::new(level.min(9));
+    let cap = data.len() / 2 + 64;
+    let r = match f {
+        Fmt::Gzip => {
+            let mut e = flate2::write::GzEncoder::new(Vec::with_capacity(cap), lvl);
+            e.write_all(data).and_then(|_| e.finish())
+        }
+        Fmt::Zlib => {
+            let mut e = flate2::write::ZlibEncoder::new(Vec::with_capacity(cap), lvl);
+            e.write_all(data).and_then(|_| e.finish())
+        }
+        Fmt::Deflate => {
+            let mut e = flate2::write::DeflateEncoder::new(Vec::with_capacity(cap), lvl);
+            e.write_all(data).and_then(|_| e.finish())
+        }
+    };
+    r.expect("compressing into a Vec cannot fail")
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn decompress(f: Fmt, data: &[u8]) -> Result<Vec<u8>, String> {
+    stream_decompress(f, data)
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn inflate_exact(src: &[u8], dst: &mut [u8]) -> Result<(), String> {
+    let mut d = flate2::Decompress::new(false);
+    match d.decompress(src, dst, flate2::FlushDecompress::Finish) {
+        Ok(flate2::Status::StreamEnd) if d.total_out() as usize == dst.len() => Ok(()),
+        Ok(flate2::Status::StreamEnd) => Err("shorter than its declared size".into()),
+        Ok(_) => Err("larger than its declared size or truncated".into()),
+        Err(_) => Err("corrupt deflate data".into()),
     }
 }
 

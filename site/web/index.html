@@ -1,0 +1,285 @@
+<title>rapid_archive Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single working column — controls up top, results stacked newest-first, each result a small horizontal bar chart. */
+:root {
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --ink: #16202a;
+  --muted: #5b6875;
+  --line: #d9dee4;
+  --rust: #b7410e;      /* rapid_archive: Rust orange */
+  --dart: #1f6fb2;      /* package:archive: Dart blue */
+  --browser: #7c8794;   /* browser built-in */
+  --ok: #1e7a46;
+  --bad: #b42318;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --surface: #17202a; --ink: #e6ebf0; --muted: #98a4b1; --line: #2a3643;
+    --rust: #f0773b; --dart: #5aa7e8; --browser: #8b97a4; --ok: #4cc685; --bad: #ff7a6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --surface: #17202a; --ink: #e6ebf0; --muted: #98a4b1; --line: #2a3643;
+  --rust: #f0773b; --dart: #5aa7e8; --browser: #8b97a4; --ok: #4cc685; --bad: #ff7a6b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+
+.masthead { display: grid; gap: 10px; }
+.masthead h1 {
+  font: 800 clamp(30px, 6vw, 46px)/1.02 var(--font-display);
+  letter-spacing: -0.02em; margin: 0; text-wrap: balance;
+}
+.masthead h1 .vs { color: var(--muted); font-weight: 600; }
+.masthead h1 .r { color: var(--rust); }
+.masthead h1 .d { color: var(--dart); }
+.masthead p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px; display: grid; gap: 16px;
+}
+.drop {
+  border: 2px dashed var(--line); border-radius: 8px; padding: 22px 18px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--rust); background: color-mix(in srgb, var(--rust) 7%, transparent); }
+.drop p { margin: 0; flex: 1 1 260px; min-width: 0; color: var(--muted); }
+.drop p strong { color: var(--ink); font-weight: 600; }
+
+button, select {
+  font: 500 14px var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 7px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.primary { background: var(--rust); border-color: var(--rust); color: #fff; }
+button:disabled { opacity: .5; cursor: progress; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--dart); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row label { color: var(--muted); font-size: 14px; }
+.row .spacer { flex: 1; }
+
+.status { font: 13px/1.4 var(--font-mono); color: var(--muted); margin: 0; min-height: 1.4em; }
+.status.error { color: var(--bad); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: 6px; vertical-align: -1px; background: var(--c);
+}
+
+.results { display: grid; gap: 14px; }
+.note {
+  font-size: 13px; color: var(--muted); margin: 0;
+  border-left: 3px solid var(--line); padding-left: 10px;
+}
+.result {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; display: grid; gap: 10px;
+}
+.result header { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.result header > div:first-child { min-width: 0; flex: 1 1 240px; }
+.result h3 { font: 700 18px/1.2 var(--font-display); margin: 0; text-transform: capitalize; }
+.meta { margin: 2px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.speedup { text-align: right; line-height: 1.1; }
+.speedup strong { display: block; font: 800 30px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.speedup span { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+.speedup.win strong { color: var(--rust); }
+.speedup.loss strong { color: var(--muted); }
+
+.bar-row {
+  display: grid; grid-template-columns: 150px 1fr 118px; gap: 12px; align-items: center;
+  font-size: 13px;
+}
+.bar-label { color: var(--muted); }
+.bar-track { height: 12px; background: color-mix(in srgb, var(--line) 55%, transparent); border-radius: 3px; overflow: hidden; }
+.bar { display: block; height: 100%; border-radius: 3px; }
+.bar.archive { background: var(--dart); }
+.bar.rapid { background: var(--rust); }
+.bar.browser { background: var(--browser); }
+.bar-value { font: 500 13px var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.bar-value small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.check { margin: 2px 0 0; font-size: 12.5px; }
+.check.ok { color: var(--ok); }
+.check.fail { color: var(--bad); font-weight: 600; }
+.check::before { content: "● "; }
+
+.about { color: var(--muted); font-size: 13.5px; display: grid; gap: 8px; max-width: 70ch; }
+.about h2 { font: 700 16px var(--font-display); color: var(--ink); margin: 0; }
+.about p { margin: 0; }
+code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line) 50%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+@media (max-width: 560px) {
+  .bar-row { grid-template-columns: 1fr 96px; }
+  .bar-label { grid-column: 1 / -1; margin-bottom: -6px; }
+  .speedup { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { .drop { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1><span class="r">rapid_archive</span> <span class="vs">vs</span> <span class="d">archive</span></h1>
+    <p>Benchmark zip and gzip in your browser: the Rust core compiled to WebAssembly against the pure-Dart <code>archive</code> package that Flutter web apps use today. Files stay on your device, and nothing is uploaded.</p>
+  </header>
+
+  <section class="panel" aria-label="Choose what to benchmark">
+    <div class="drop" id="drop">
+      <p><strong>Drop a .zip, a .gz or any file here.</strong> A .zip is extracted and re-zipped, a .gz is decompressed, and anything else is gzipped and unzipped.</p>
+      <button class="primary" id="pick" disabled>Choose file</button>
+      <input type="file" id="file" hidden>
+    </div>
+    <div class="row">
+      <button id="sample-json" disabled>Try 32 MB of JSON</button>
+      <button id="sample-zip" disabled>Try a zip of 2,000 files</button>
+      <span class="spacer"></span>
+      <label for="runs">Runs per step</label>
+      <select id="runs">
+        <option value="1">1</option>
+        <option value="3" selected>3</option>
+        <option value="5">5</option>
+      </select>
+      <button id="clear" disabled>Clear</button>
+    </div>
+    <p class="status" id="status" role="status">Loading…</p>
+  </section>
+
+  <div class="legend" aria-hidden="true">
+    <span style="--c: var(--dart)">archive 4.6 (pure Dart → JS)</span>
+    <span style="--c: var(--rust)">rapid_archive (Rust → WebAssembly)</span>
+    <span style="--c: var(--browser)">Browser built-in (gzip only)</span>
+  </div>
+
+  <section class="results" aria-live="polite">
+    <p class="note" id="example-note">Example results from headless Chrome on a 4-core Linux machine. Run a sample or drop your own file to measure on this device.</p>
+    <div class="results" id="results">
+      <article class="result">
+      <header>
+        <div>
+          <h3>gzip decompress</h3>
+          <p class="meta">sample orders.json · 32.0 MB</p>
+        </div>
+        <div class="speedup win">
+          <strong>5.1×</strong>
+          <span>faster than archive</span>
+        </div>
+      </header>
+            <div class="bar-row">
+        <span class="bar-label">archive (Dart)</span>
+        <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
+        <span class="bar-value">515 ms<small>62 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">rapid_archive (Rust)</span>
+        <span class="bar-track"><span class="bar rapid" style="width:19.8%"></span></span>
+        <span class="bar-value">102 ms<small>314 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">Browser built-in</span>
+        <span class="bar-track"><span class="bar browser" style="width:27.7%"></span></span>
+        <span class="bar-value">143 ms<small>224 MB/s</small></span>
+      </div>
+      <p class="check ok">Output verified byte for byte</p>
+    </article>    <article class="result">
+      <header>
+        <div>
+          <h3>gzip compress</h3>
+          <p class="meta">sample orders.json · 32.0 MB · output 6.7 MB vs 6.7 MB</p>
+        </div>
+        <div class="speedup win">
+          <strong>4.4×</strong>
+          <span>faster than archive</span>
+        </div>
+      </header>
+            <div class="bar-row">
+        <span class="bar-label">archive (Dart)</span>
+        <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
+        <span class="bar-value">2.53 s<small>13 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">rapid_archive (Rust)</span>
+        <span class="bar-track"><span class="bar rapid" style="width:22.8%"></span></span>
+        <span class="bar-value">577 ms<small>55 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">Browser built-in</span>
+        <span class="bar-track"><span class="bar browser" style="width:26.3%"></span></span>
+        <span class="bar-value">666 ms<small>48 MB/s</small></span>
+      </div>
+      <p class="check ok">Output verified byte for byte</p>
+    </article>    <article class="result">
+      <header>
+        <div>
+          <h3>zip create</h3>
+          <p class="meta">sample orders.zip · 31.3 MB · 2000 files</p>
+        </div>
+        <div class="speedup win">
+          <strong>3.6×</strong>
+          <span>faster than archive</span>
+        </div>
+      </header>
+            <div class="bar-row">
+        <span class="bar-label">archive (Dart)</span>
+        <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
+        <span class="bar-value">1.68 s<small>19 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">rapid_archive (Rust)</span>
+        <span class="bar-track"><span class="bar rapid" style="width:27.4%"></span></span>
+        <span class="bar-value">461 ms<small>68 MB/s</small></span>
+      </div>
+      
+      <p class="check ok">Output verified byte for byte</p>
+    </article>    <article class="result">
+      <header>
+        <div>
+          <h3>zip extract</h3>
+          <p class="meta">sample orders.zip · 31.3 MB · 2000 files, 31.3 MB unpacked</p>
+        </div>
+        <div class="speedup win">
+          <strong>6.1×</strong>
+          <span>faster than archive</span>
+        </div>
+      </header>
+            <div class="bar-row">
+        <span class="bar-label">archive (Dart)</span>
+        <span class="bar-track"><span class="bar archive" style="width:100.0%"></span></span>
+        <span class="bar-value">665 ms<small>47 MB/s</small></span>
+      </div>
+            <div class="bar-row">
+        <span class="bar-label">rapid_archive (Rust)</span>
+        <span class="bar-track"><span class="bar rapid" style="width:16.5%"></span></span>
+        <span class="bar-value">109 ms<small>286 MB/s</small></span>
+      </div>
+      
+      <p class="check ok">Output verified byte for byte</p>
+    </article>
+    </div>
+  </section>
+
+  <section class="about">
+    <h2>What this measures</h2>
+    <p>Each step runs once to warm up, then the median of the chosen runs is shown. Every output is checked byte for byte against the original, and each library has to read the other's output.</p>
+    <p>On the web, rapid_archive uses zlib-rs, a pure Rust deflate, on a single thread. On Android, iOS and desktop it uses libdeflate and every CPU core, so native speedups are larger: up to 10× on an M4 MacBook.</p>
+  </section>
+</div>
+
+<script src="main.dart.js" defer></script>

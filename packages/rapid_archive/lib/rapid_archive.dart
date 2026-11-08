@@ -23,6 +23,11 @@ export 'package:archive/archive.dart'
     show Archive, ArchiveFile, CompressionType;
 export 'src/bindings.dart' show RapidArchiveException;
 
+/// Prepares the library. On web this compiles the WebAssembly module, so call
+/// and await it once at startup (for example in `main()`). On every other
+/// platform it returns immediately.
+Future<void> ensureRapidArchiveInitialized() => ffi.ensureInitialized();
+
 /// gzip compression. Same API as `package:archive`'s `GZipEncoder`.
 class GZipEncoder {
   /// With [parallel], inputs of 2 MB or more are compressed on every CPU
@@ -79,7 +84,7 @@ class ZipEncoder {
   Uint8List encodeBytes(Archive archive, {int? level}) {
     final files = archive.files;
     final names = BytesBuilder(copy: false);
-    final table = Uint64List(files.length * 5);
+    final table = List<int>.filled(files.length * 5, 0);
     var namesLen = 0;
     var blobLen = 0;
     final contents = <Uint8List>[];

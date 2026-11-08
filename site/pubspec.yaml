@@ -1,0 +1,10 @@
+name: rapid_archive_bench_site
+description: In-browser benchmark of rapid_archive (Rust/WebAssembly) vs package:archive.
+publish_to: none
+environment:
+  sdk: ^3.6.0
+dependencies:
+  archive: ^4.6.0
+  rapid_archive:
+    path: ../packages/rapid_archive
+  web: ^1.1.0
