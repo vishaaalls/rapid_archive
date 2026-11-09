@@ -1,7 +1,10 @@
 name: rapid_archive
 description: Drop-in fast gzip, zlib and zip for Dart and Flutter, powered by Rust.
-version: 0.1.0
-publish_to: none
+version: 0.2.0
+homepage: https://github.com/vishaaalls/rapid_archive
+repository: https://github.com/vishaaalls/rapid_archive/tree/main/packages/rapid_archive
+issue_tracker: https://github.com/vishaaalls/rapid_archive/issues
+topics: [compression, zip, gzip, ffi, rust]
 environment:
   sdk: ^3.6.0
 dependencies:
