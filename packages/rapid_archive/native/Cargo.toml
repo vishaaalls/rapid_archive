@@ -1,6 +1,6 @@
 [package]
 name = "rapid_archive"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Rust core for the rapid_archive Flutter/Dart package: fast gzip and zip."
 license = "MIT"

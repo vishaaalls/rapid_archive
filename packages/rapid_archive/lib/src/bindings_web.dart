@@ -75,9 +75,20 @@ ByteData get _view => _buf.asByteData();
 /// Copies [data] into wasm memory. Release with [_release].
 int _put(Uint8List data) {
   final p = _call('ra_input_alloc', [data.length]);
-  _mem.setRange(p, p + data.length, data);
+  // One JS-side bulk copy. Uint8List.setRange into wasm memory copies byte by
+  // byte across the JS boundary under dart2wasm, which was ~25x slower.
+  _jsMem.callMethod<JSAny?>('set'.toJS, data.toJS, p.toJS);
   return p;
 }
+
+/// Copies [len] bytes at [ptr] out of wasm memory. slice() copies in JS, and
+/// toDart wraps the copy without another one.
+Uint8List _copyOut(int ptr, int len) => _jsMem
+    .callMethod<JSUint8Array>('slice'.toJS, ptr.toJS, (ptr + len).toJS)
+    .toDart;
+
+JSUint8Array get _jsMem =>
+    JSUint8Array((_x['memory'] as JSObject)['buffer'] as JSArrayBuffer);
 
 void _release(int p, int len) => _call('ra_input_free', [p, len]);
 
@@ -96,7 +107,7 @@ Never _fail() {
 
 /// Copies a Rust-owned result out of wasm memory and frees it.
 Uint8List _take(int ptr, int len) {
-  final r = Uint8List.fromList(Uint8List.sublistView(_mem, ptr, ptr + len));
+  final r = _copyOut(ptr, len);
   _call('ra_free', [ptr]);
   return r;
 }
@@ -167,7 +178,7 @@ Uint8List streamPush(int h, Uint8List data, bool finish) {
   final v = _view;
   final ptr = v.getUint32(o, Endian.little);
   final len = v.getUint32(o + 4, Endian.little);
-  return Uint8List.fromList(Uint8List.sublistView(_mem, ptr, ptr + len));
+  return _copyOut(ptr, len);
 }
 
 void streamFree(int h) => _call('ra_stream_free', [h]);

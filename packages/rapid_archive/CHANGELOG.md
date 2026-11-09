@@ -1,3 +1,8 @@
+## 0.2.1
+
+- Web: much faster when built with dart2wasm (bulk copies into and out of
+  WebAssembly memory).
+
 ## 0.2.0
 
 - Streaming with constant memory: `encodeStream`, `decodeStream` and
