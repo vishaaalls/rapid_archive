@@ -7,32 +7,32 @@ const prebuiltBaseUrl =
     'https://github.com/vishaaalls/rapid_archive/releases/download';
 
 /// Release tag holding the binaries, e.g. 'v0.1.0'.
-const prebuiltVersion = 'v0.1.0';
+const prebuiltVersion = 'v0.2.0';
 
 /// '<rust triple>/<file name>' -> SHA-256 of the file.
 const prebuiltHashes = <String, String>{
   'aarch64-apple-darwin/librapid_archive.dylib':
-      '23a01bb6712ac9204d53ad9cf1f619f10ff23c94f71963b2e16d95e22065cc5a',
+      '07555ded6eb592100026672599da3e6d55a07bcaecb08b5f65b7fe9928bcc360',
   'aarch64-apple-ios-sim/librapid_archive.dylib':
-      '9451b198a0b671822bee8e87522714ac30a89387f550cfa80851217fb4f0a1dc',
+      '90375b94d5fce1729eba33aa5b988d5a4ccdb15e564127bcafcbaf97e4592486',
   'aarch64-apple-ios/librapid_archive.dylib':
-      '3163ac1ab930edc0c801c16ab627aa0b6f3f9b08811be96a6c31c28fc8a163f8',
+      'da91cd08d02008d2e3d654b7e6cd518c4ab7d5069f484df3fc0f9332cf7aae12',
   'aarch64-linux-android/librapid_archive.so':
-      '2151c0f43acf4030f83eb0fd96bdca17aa3fd9b3255bcfcced09553a08474066',
+      '038cba9d45968c67c157a360d68272a680a3226a9d6c74bf1280b4beda22a6eb',
   'aarch64-pc-windows-msvc/rapid_archive.dll':
-      '7282ac12d15e9dfe98e3a82dcc98d07da193f345d36779072345befd395e4669',
+      'bed0a701db4468680ae5842b357ab5bb9c0ac0e77ed69098bfbde9918fc16e00',
   'aarch64-unknown-linux-gnu/librapid_archive.so':
-      'a97974b7ec56618bd624bfba76c2ce9a312b7983029b1ebbd7ea792842b447a1',
+      '0a6da82cbdb4120e9376a5c6d3fca8f13389ad5defd0f58181a187d0af557a47',
   'armv7-linux-androideabi/librapid_archive.so':
-      'a9733762fc660f22790955aa837a59fc28abaf9768b985c2e272818c586acce4',
+      '8d81fd7ea534d2f75d9c845c11d2ae39950da5a9a9c20d2b5373b5a2bec4e660',
   'x86_64-apple-darwin/librapid_archive.dylib':
-      'cc57c85e4db52529586842f525c995886b3a3f2335d81b6e52893e07e5afbbe2',
+      '5294803aee29df721a27ba055929c20e3304bd03576d4bf03b3e9c66e1e8fc9b',
   'x86_64-apple-ios/librapid_archive.dylib':
-      '736587d60f0d74798119f039a125005db849895659f31e1b905b4d241c8670c1',
+      '9ee48a200b460fdedab02108ba6c9752bfa7155031c9da6cb4f8105c95f31381',
   'x86_64-linux-android/librapid_archive.so':
-      '0fbd481f6e0de4ce01480f83404544400219f3a6c51258c448c981217baabc6f',
+      '74818b988b605eae3523875a0db60bce2433ac17718d4aaf715a3ae33b5fb98b',
   'x86_64-pc-windows-msvc/rapid_archive.dll':
-      'f0951217fe6f9e9d3fc071f6e78d3f9fcaa8adb32a4615e6dd5a5964ba0538b9',
+      'dbf454a9920b085cfd80af08394ab0eb35e0a912f47501075163ed55dc474a8a',
   'x86_64-unknown-linux-gnu/librapid_archive.so':
-      'ae2add517eb8254bc3ee47f2a288461073be337a8fecae0b93b3b7ef92cf329b',
+      '63f5ebd4660cbe1f3c5a1d72efb4cb96a8addc59ac5b13a2536b04708dcc74f2',
 };
