@@ -12,7 +12,9 @@
 /// existing code keeps compiling.
 library;
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart' show Archive, ArchiveFile, CompressionType;
@@ -27,6 +29,31 @@ export 'src/bindings.dart' show RapidArchiveException;
 /// and await it once at startup (for example in `main()`). On every other
 /// platform it returns immediately.
 Future<void> ensureRapidArchiveInitialized() => ffi.ensureInitialized();
+
+/// Runs [input] through one native streaming codec with constant memory.
+/// The native handle is released when the stream ends, fails or is
+/// cancelled.
+Stream<Uint8List> _pipe(Stream<List<int>> input, bool decode,
+    ffi.StreamFormat f, int level, bool parallel) async* {
+  final h = ffi.streamNew(decode, f, level, parallel);
+  try {
+    // Bound the work (and output) of each native call. Decoding uses small
+    // steps because 64 KiB can inflate to many megabytes.
+    final step = decode ? 1 << 16 : 1 << 22;
+    await for (final event in input) {
+      final b = ffi.asBytes(event);
+      for (var o = 0; o < b.length; o += step) {
+        final out = ffi.streamPush(
+            h, Uint8List.sublistView(b, o, math.min(o + step, b.length)), false);
+        if (out.isNotEmpty) yield out;
+      }
+    }
+    final out = ffi.streamPush(h, Uint8List(0), true);
+    if (out.isNotEmpty) yield out;
+  } finally {
+    ffi.streamFree(h);
+  }
+}
 
 /// gzip compression. Same API as `package:archive`'s `GZipEncoder`.
 class GZipEncoder {
@@ -47,6 +74,23 @@ class GZipEncoder {
   /// it uses every CPU core.
   Future<Uint8List> encodeBytesAsync(List<int> bytes, {int? level}) =>
       ffi.compressAsync(ffi.StreamFormat.gzip, bytes, level ?? -1);
+
+  /// Compresses a stream of any size with constant memory. The output is
+  /// one standard gzip stream. With [parallel], each window of input
+  /// (2 MiB per core) is compressed on every core.
+  ///
+  /// ```dart
+  /// await File('big.log').openRead()
+  ///     .transform(const GZipEncoder(parallel: true).transformer())
+  ///     .pipe(File('big.log.gz').openWrite());
+  /// ```
+  Stream<Uint8List> encodeStream(Stream<List<int>> input, {int? level}) =>
+      _pipe(input, false, ffi.StreamFormat.gzip, level ?? -1, parallel);
+
+  /// [encodeStream] as a `StreamTransformer`, for `Stream.transform`.
+  StreamTransformer<List<int>, List<int>> transformer({int? level}) =>
+      StreamTransformer.fromBind(
+          (s) => encodeStream(s, level: level).cast<List<int>>());
 }
 
 /// gzip decompression. Concatenated gzip members are decoded like `gunzip`.
@@ -61,6 +105,16 @@ class GZipDecoder {
   /// Fastest gunzip on every platform (browser built-in on web).
   Future<Uint8List> decodeBytesAsync(List<int> bytes) =>
       ffi.decompressAsync(ffi.StreamFormat.gzip, bytes);
+
+  /// Decompresses a gzip stream of any size with constant memory.
+  /// Concatenated members are decoded like `gunzip`. A truncated or corrupt
+  /// stream is an error.
+  Stream<Uint8List> decodeStream(Stream<List<int>> input) =>
+      _pipe(input, true, ffi.StreamFormat.gzip, 0, false);
+
+  /// [decodeStream] as a `StreamTransformer`, for `Stream.transform`.
+  StreamTransformer<List<int>, List<int>> transformer() =>
+      StreamTransformer.fromBind((s) => decodeStream(s).cast<List<int>>());
 }
 
 /// zlib (RFC 1950) compression.
@@ -75,6 +129,19 @@ class ZLibEncoder {
 
   List<int> encode(List<int> bytes, {int? level}) =>
       encodeBytes(bytes, level: level);
+
+  /// Compresses a stream of any size with constant memory. See
+  /// [GZipEncoder.encodeStream].
+  Stream<Uint8List> encodeStream(Stream<List<int>> input,
+          {int? level, bool raw = false}) =>
+      _pipe(input, false, raw ? ffi.StreamFormat.deflate : ffi.StreamFormat.zlib,
+          level ?? -1, parallel);
+
+  /// [encodeStream] as a `StreamTransformer`, for `Stream.transform`.
+  StreamTransformer<List<int>, List<int>> transformer(
+          {int? level, bool raw = false}) =>
+      StreamTransformer.fromBind(
+          (s) => encodeStream(s, level: level, raw: raw).cast<List<int>>());
 }
 
 /// zlib (RFC 1950) decompression; `raw: true` for bare deflate.
@@ -83,6 +150,16 @@ class ZLibDecoder {
 
   Uint8List decodeBytes(List<int> bytes, {bool verify = false, bool raw = false}) =>
       ffi.decompress(raw ? ffi.StreamFormat.deflate : ffi.StreamFormat.zlib, bytes);
+
+  /// Decompresses a stream of any size with constant memory.
+  Stream<Uint8List> decodeStream(Stream<List<int>> input, {bool raw = false}) =>
+      _pipe(input, true, raw ? ffi.StreamFormat.deflate : ffi.StreamFormat.zlib,
+          0, false);
+
+  /// [decodeStream] as a `StreamTransformer`, for `Stream.transform`.
+  StreamTransformer<List<int>, List<int>> transformer({bool raw = false}) =>
+      StreamTransformer.fromBind(
+          (s) => decodeStream(s, raw: raw).cast<List<int>>());
 }
 
 /// Builds zip files, compressing entries in parallel on every core.

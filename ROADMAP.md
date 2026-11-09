@@ -16,16 +16,18 @@ the same tests natively (macOS, Linux) and in Chrome (WebAssembly).
   by the hook), test on the simulator and a device, and measure the app-size cost.
 - Add `example/`, a Flutter app that runs the benchmark on the phone itself.
 
-## 2. Prebuilt binaries (workflows written 2026-11-08; first release pending)
+## 2. Prebuilt binaries (done: v0.1.0, 12 targets)
 - GitHub Actions builds the library for every target on each tagged release and uploads the
   binaries plus SHA-256 checksums to the GitHub Release.
 - `hook/build.dart` downloads the matching binary and verifies its checksum. It builds with cargo
   only when Rust is installed and no download fits, or when a contributor forces it.
 
-## 3. Big files
-- Streaming APIs (`encodeStream`, `decodeStream`, `extractToDirectory`) so a 10 GB zip never sits
-  in memory, plus zip64 writing (archives over 4 GB or 65,535 files).
-- An `Isolate.run` helper so large jobs don't block a Flutter UI.
+## 3. Big files (done 2026-11-09)
+- `encodeStream` / `decodeStream` / `transformer()` on the gzip and zlib classes (web too).
+- `rapid_archive_io.dart`: `gzipFile`, `gunzipFile`, `extractFileToDisk`,
+  `ZipFileEncoder.zipDirectory`, each in a background isolate.
+- zip64 writing (archives or entries over 4 GB, more than 65,535 entries).
+- Checked on 2.5 GB and 5 GB files: memory stays flat, about 50 MB above the Dart VM's own use.
 
 ## 4. Web extras
 - Multi-threaded WebAssembly when the page is cross-origin isolated (COOP/COEP headers).

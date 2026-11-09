@@ -147,6 +147,31 @@ Uint8List zipEncode(
   return _take(v.getUint32(o, Endian.little), v.getUint32(o + 4, Endian.little));
 }
 
+/// Opens a streaming encoder or decoder; returns an opaque handle. (The
+/// browser has one thread here, so `parallel` is ignored.)
+int streamNew(bool decode, StreamFormat f, int level, bool parallel) {
+  final h = _call('ra_stream_new', [decode ? 1 : 0, f.index, level, 0]);
+  if (h == 0) _fail();
+  return h;
+}
+
+/// Feeds [data] to the stream [h]; returns the output that is ready.
+Uint8List streamPush(int h, Uint8List data, bool finish) {
+  final p = _put(data);
+  final o = _out;
+  final rc = _call(
+      'ra_stream_push', [h, p, data.length, finish ? 1 : 0, o, o + 4]);
+  _release(p, data.length);
+  if (rc != 0) _fail();
+  // The output lives in a buffer the stream reuses: copy, never free.
+  final v = _view;
+  final ptr = v.getUint32(o, Endian.little);
+  final len = v.getUint32(o + 4, Endian.little);
+  return Uint8List.fromList(Uint8List.sublistView(_mem, ptr, ptr + len));
+}
+
+void streamFree(int h) => _call('ra_stream_free', [h]);
+
 RawZip zipDecode(List<int> zip) {
   final b = asBytes(zip);
   final p = _put(b);

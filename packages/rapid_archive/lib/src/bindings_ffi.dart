@@ -55,6 +55,18 @@ final class RaZip extends Struct {
 @Native<Int32 Function(Pointer<Uint8>, Size, Pointer<RaZip>)>(isLeaf: true)
 external int ra_zip_decode(Pointer<Uint8> data, int len, Pointer<RaZip> out);
 
+@Native<Pointer<Void> Function(Int32, Int32, Int32, Int32)>(isLeaf: true)
+external Pointer<Void> ra_stream_new(
+    int decode, int format, int level, int parallel);
+
+@Native<Int32 Function(Pointer<Void>, Pointer<Uint8>, Size, Int32,
+    Pointer<Pointer<Uint8>>, Pointer<Size>)>(isLeaf: true)
+external int ra_stream_push(Pointer<Void> h, Pointer<Uint8> data, int len,
+    int finish, Pointer<Pointer<Uint8>> out, Pointer<Size> outLen);
+
+@Native<Void Function(Pointer<Void>)>(isLeaf: true)
+external void ra_stream_free(Pointer<Void> h);
+
 @Native<Pointer<Utf8> Function()>(isLeaf: true)
 external Pointer<Utf8> ra_last_error();
 
@@ -78,6 +90,7 @@ final Pointer<RaZip> _zipOut = calloc<RaZip>();
 Never _fail() => throw RapidArchiveException(ra_last_error().toDartString());
 
 
+/// Wraps a Rust-owned buffer with no copy; the GC frees it later.
 Uint8List _owned(Pointer<Uint8> p, int len) {
   if (len == 0) {
     ra_free(p);
@@ -85,6 +98,8 @@ Uint8List _owned(Pointer<Uint8> p, int len) {
   }
   return p.asTypedList(len, finalizer: _free);
 }
+
+
 
 
 Uint8List compress(StreamFormat f, List<int> data, int level,
@@ -132,6 +147,28 @@ RawZip zipDecode(List<int> zip) {
   return RawZip(r.count, _owned(r.data, r.dataLen),
       _owned(r.names, r.namesLen), table);
 }
+
+/// Opens a streaming encoder or decoder; returns an opaque handle.
+int streamNew(bool decode, StreamFormat f, int level, bool parallel) {
+  final h = ra_stream_new(decode ? 1 : 0, f.index, level, parallel ? 1 : 0);
+  if (h == nullptr) _fail();
+  return h.address;
+}
+
+/// Feeds [data] to the stream [h]; returns the output that is ready. Rust
+/// writes it into one buffer it reuses for every call, so it is copied onto
+/// the Dart heap here (and must not be freed).
+Uint8List streamPush(int h, Uint8List data, bool finish) {
+  if (ra_stream_push(Pointer.fromAddress(h), data.address, data.length,
+          finish ? 1 : 0, _outPtr, _outLen) !=
+      0) {
+    _fail();
+  }
+  final len = _outLen.value;
+  return len == 0 ? Uint8List(0) : Uint8List.fromList(_outPtr.value.asTypedList(len));
+}
+
+void streamFree(int h) => ra_stream_free(Pointer.fromAddress(h));
 
 /// Native platforms: the sync path is already the fastest. (Run it in an
 /// isolate with `Isolate.run` for large inputs on a UI thread.)

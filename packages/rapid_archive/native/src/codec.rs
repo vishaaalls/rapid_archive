@@ -102,7 +102,7 @@ pub fn compress(f: Fmt, data: &[u8], level: u32) -> Vec<u8> {
     })
 }
 
-const CHUNK: usize = 1 << 20;
+pub(crate) const CHUNK: usize = 1 << 20;
 
 /// Multi-core compression. Output is a single standard stream; it is ~2-5%
 /// larger than [`compress`] because each 1 MiB chunk starts with an empty
@@ -143,7 +143,7 @@ pub fn compress_parallel(f: Fmt, data: &[u8], level: u32) -> Vec<u8> {
 
 /// Raw deflate of one chunk; non-final chunks end with a sync flush so they
 /// end byte-aligned and can be concatenated.
-fn deflate_chunk(c: &[u8], lvl: Compression, last: bool) -> Vec<u8> {
+pub(crate) fn deflate_chunk(c: &[u8], lvl: Compression, last: bool) -> Vec<u8> {
     let mut z = Compress::new(lvl, false);
     let mut out = Vec::with_capacity(c.len() / 2 + 1024);
     let flush = if last { FlushCompress::Finish } else { FlushCompress::Sync };
@@ -157,7 +157,7 @@ fn deflate_chunk(c: &[u8], lvl: Compression, last: bool) -> Vec<u8> {
     }
 }
 
-fn zlib_header(level: u32) -> [u8; 2] {
+pub(crate) fn zlib_header(level: u32) -> [u8; 2] {
     let flevel = match level {
         0 | 1 => 0,
         2..=5 => 1,

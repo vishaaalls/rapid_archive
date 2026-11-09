@@ -16,6 +16,9 @@ use std::ffi::c_char;
 use rayon::prelude::*;
 
 mod codec;
+#[cfg(not(target_arch = "wasm32"))]
+mod files;
+mod stream;
 mod zipread;
 mod zipwrite;
 
@@ -353,6 +356,164 @@ fn zip_decode(data: &[u8]) -> Result<RaZip, String> {
         names_len,
         table: table_buf,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Streaming (constant memory)
+// ---------------------------------------------------------------------------
+
+/// Opens a streaming encoder (`decode` = 0) or decoder (`decode` != 0) for
+/// gzip (0), zlib (1) or raw deflate (2). `parallel` != 0 makes a multi-core
+/// encoder. Returns null on a bad format. Release with `ra_stream_free`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ra_stream_new(decode: i32, format: i32, level_: i32, parallel: i32) -> *mut stream::Codec {
+    let Some(f) = fmt(format) else {
+        set_err("unknown format");
+        return std::ptr::null_mut();
+    };
+    Box::into_raw(Box::new(stream::Codec::new(decode != 0, f, level(level_), parallel != 0)))
+}
+
+/// Feeds `len` bytes to a stream and returns the output that is ready (it can
+/// be empty). With `finish` != 0 the stream is completed; a truncated
+/// compressed stream is an error. The output is a view of a buffer the
+/// stream owns: copy it before the next call on this stream, and do NOT
+/// pass it to `ra_free`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_stream_push(
+    h: *mut stream::Codec,
+    data: *const u8,
+    len: usize,
+    finish: i32,
+    out: *mut *mut u8,
+    out_len: *mut usize,
+) -> i32 {
+    let Some(c) = (unsafe { h.as_mut() }) else { return set_err("null stream") };
+    match c.push(unsafe { slice(data, len) }, finish != 0) {
+        Ok(v) => {
+            unsafe {
+                *out = v.as_ptr() as *mut u8;
+                *out_len = v.len();
+            }
+            0
+        }
+        Err(e) => set_err(e),
+    }
+}
+
+/// Releases a stream from `ra_stream_new`. Null is a no-op.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_stream_free(h: *mut stream::Codec) {
+    if !h.is_null() {
+        drop(unsafe { Box::from_raw(h) });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Files on disk (not on the web)
+// ---------------------------------------------------------------------------
+
+#[cfg(not(target_arch = "wasm32"))]
+unsafe fn path<'a>(p: *const u8, len: usize) -> Result<&'a std::path::Path, String> {
+    let s = std::str::from_utf8(unsafe { slice(p, len) }).map_err(|_| "path is not UTF-8")?;
+    if s.is_empty() {
+        return Err("empty path".into());
+    }
+    Ok(std::path::Path::new(s))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn put_u64(out: *mut u64, v: u64) -> i32 {
+    if !out.is_null() {
+        unsafe { *out = v };
+    }
+    0
+}
+
+/// Compresses the file at `src` into `dst` with constant memory.
+#[cfg(not(target_arch = "wasm32"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_compress_file(
+    format: i32,
+    src: *const u8,
+    src_len: usize,
+    dst: *const u8,
+    dst_len: usize,
+    level_: i32,
+    parallel: i32,
+) -> i32 {
+    let Some(f) = fmt(format) else { return set_err("unknown format") };
+    let r = (|| {
+        let (s, d) = unsafe { (path(src, src_len)?, path(dst, dst_len)?) };
+        files::compress_file(f, s, d, level(level_), parallel != 0)
+    })();
+    match r {
+        Ok(()) => 0,
+        Err(e) => set_err(e),
+    }
+}
+
+/// Decompresses the file at `src` into `dst`; writes the output size to `out_n`.
+#[cfg(not(target_arch = "wasm32"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_decompress_file(
+    format: i32,
+    src: *const u8,
+    src_len: usize,
+    dst: *const u8,
+    dst_len: usize,
+    out_n: *mut u64,
+) -> i32 {
+    let Some(f) = fmt(format) else { return set_err("unknown format") };
+    let r = (|| {
+        let (s, d) = unsafe { (path(src, src_len)?, path(dst, dst_len)?) };
+        files::decompress_file(f, s, d)
+    })();
+    match r {
+        Ok(n) => put_u64(out_n, n),
+        Err(e) => set_err(e),
+    }
+}
+
+/// Extracts the zip file at `zip` into the folder `dir`; writes the entry count to `out_count`.
+#[cfg(not(target_arch = "wasm32"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_zip_extract_file(
+    zip: *const u8,
+    zip_len: usize,
+    dir: *const u8,
+    dir_len: usize,
+    out_count: *mut u64,
+) -> i32 {
+    let r = (|| {
+        let (z, d) = unsafe { (path(zip, zip_len)?, path(dir, dir_len)?) };
+        files::extract_zip(z, d)
+    })();
+    match r {
+        Ok(n) => put_u64(out_count, n),
+        Err(e) => set_err(e),
+    }
+}
+
+/// Zips the folder `dir` into the file `zip`; writes the entry count to `out_count`.
+#[cfg(not(target_arch = "wasm32"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ra_zip_create_file(
+    dir: *const u8,
+    dir_len: usize,
+    zip: *const u8,
+    zip_len: usize,
+    level_: i32,
+    out_count: *mut u64,
+) -> i32 {
+    let r = (|| {
+        let (d, z) = unsafe { (path(dir, dir_len)?, path(zip, zip_len)?) };
+        files::zip_dir(d, z, level(level_))
+    })();
+    match r {
+        Ok(n) => put_u64(out_count, n),
+        Err(e) => set_err(e),
+    }
 }
 
 #[cfg(test)]

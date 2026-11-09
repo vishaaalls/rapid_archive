@@ -13,6 +13,57 @@ final zip = const ZipEncoder().encodeBytes(archive);          // entries compres
 final files = const ZipDecoder().decodeBytes(zipBytes).files; // parallel extract, CRC-checked
 ```
 
+## Large data (constant memory)
+
+Streams and files of any size work with constant memory: the work never
+holds more than a few MB per core, whatever the file size (see the table
+below).
+
+```dart
+import 'package:rapid_archive/rapid_archive_io.dart'; // not on web
+
+// Streams: same shape as dart:io's gzip codec.
+await File('big.log').openRead()
+    .transform(const GZipEncoder(parallel: true).transformer())
+    .pipe(File('big.log.gz').openWrite());
+final lines = File('big.log.gz').openRead()
+    .transform(const GZipDecoder().transformer());
+
+// Files and folders, like package:archive's archive_io.dart. These run in a
+// background isolate, so they never block the UI.
+await gzipFile('big.log', 'big.log.gz');           // all cores
+await gunzipFile('big.log.gz', 'big.log');
+await ZipFileEncoder().zipDirectory(Directory('photos')); // photos.zip
+await extractFileToDisk('photos.zip', 'out/photos');
+```
+
+- `encodeStream` / `decodeStream` (and `transformer()`) are on `GZipEncoder`,
+  `GZipDecoder`, `ZLibEncoder` and `ZLibDecoder`. They work on web too.
+- Zips over 4 GB, files over 4 GB and more than 65,535 entries use zip64
+  automatically.
+- `extractFileToDisk` checks every CRC and declared size, and refuses entry
+  names that would land outside the output folder ("zip slip").
+- `extractFileToDisk` reads zip files only (not tar).
+
+2.5 GB log file, level 1, Linux x64 (4 cores). The Dart VM itself used
+about 260 MB of memory before the first step. "Peak" is the highest process
+memory measured during each step.
+
+| Step | Time | Peak memory |
+|---|---|---|
+| `GZipEncoder(parallel: true).transformer()` | 6.6 s | 303 MB |
+| `GZipDecoder().transformer()` | 11.5 s | 284 MB |
+| `gzipFile` | 2.9 s | 290 MB |
+| `gunzipFile` | 7.2 s | 274 MB |
+| `zipDirectory` | 3.2 s | 287 MB |
+| `extractFileToDisk` | 6.7 s | 273 MB |
+
+`native/tests/memory.rs` checks this in CI: it counts the Rust heap while
+streaming 256 MB and fails if peak memory or the number of large allocations
+grows with the input.
+
+Run it yourself: `dart run bench/large_check.dart <folder> <work-dir>`.
+
 ## Benchmarks
 
 ### MacBook Air M4 (10 cores), 256 MB inputs
@@ -107,7 +158,7 @@ run `dart run tool/update_prebuilt.dart v0.1.0` and commit `hook/prebuilt.dart`.
 - Done: gzip, zlib and raw deflate; parallel gzip/zlib; zip create and extract;
   interop tests both ways against `package:archive`; zip-bomb and corruption
   checks; web via WebAssembly; tested on Android (emulator), iOS (simulator,
-  device build) and macOS; prebuilt binaries via GitHub Actions.
-- Not yet: testing on a physical phone, zip64 writing (over 4 GB or 65,535
-  entries), streaming and file APIs, tar/bzip2/xz/zstd.
+  device build) and macOS; prebuilt binaries via GitHub Actions; streaming
+  and file APIs with constant memory; zip64.
+- Not yet: testing on a physical phone, tar/bzip2/xz/zstd.
 - Native library size: about 790 KB on linux x64, 668 KB on Android arm64.
