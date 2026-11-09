@@ -162,6 +162,15 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
     <p class="status" id="status" role="status">Loading…</p>
   </section>
 
+  <section class="panel" aria-label="Streaming check for big files">
+    <div class="drop" id="stream-drop">
+      <p><strong>Streaming: drop a file of any size, even several GB.</strong> It's gzipped and unzipped again chunk by chunk with <code>encodeStream</code> / <code>decodeStream</code>, so it's never loaded whole. Then input and output are compared by size and checksum.</p>
+      <button class="primary" id="stream-pick" disabled>Choose big file</button>
+      <input type="file" id="stream-file" hidden>
+    </div>
+    <div class="results" id="stream-results"></div>
+  </section>
+
   <div class="legend" aria-hidden="true">
     <span style="--c: var(--dart)">archive 4.6 (pure Dart → JS)</span>
     <span style="--c: var(--rust)">rapid_archive (Rust → WebAssembly)</span>
@@ -279,6 +288,7 @@ code { font: 12.5px var(--font-mono); background: color-mix(in srgb, var(--line)
     <h2>What this measures</h2>
     <p>Each step runs once to warm up, then the median of the chosen runs is shown. Every output is checked byte for byte against the original, and each library has to read the other's output.</p>
     <p>The browser's built-in gzip is native code inside the browser, so for plain gzip it can match or beat WebAssembly, especially on Apple Silicon. That's why rapid_archive's async API (<code>encodeBytesAsync</code>, <code>decodeBytesAsync</code>) uses it on the web. WebAssembly still handles zip, which browsers can't do, plus custom compression levels and every synchronous call. At the same level, rapid_archive's gzip output is also about 9% smaller.</p>
+    <p>The streaming check reads your file in chunks straight from disk, so even a multi-GB file fits in memory. Both sides do the same work: gzip, unzip, then checksum the output. Older browsers without <code>CompressionStream</code> show only the rapid_archive bar.</p>
     <p>On Android, iOS and desktop there is no WebAssembly overhead and rapid_archive uses every CPU core, so native speedups are larger: up to 10× on an M4 MacBook.</p>
   </section>
 </div>

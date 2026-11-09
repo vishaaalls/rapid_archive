@@ -1,6 +1,7 @@
 // Web Worker entry: runs benchmarks off the page's main thread.
 //
-// In:  {cmd: 'file', name, runs, buf: ArrayBuffer}  or  {cmd: 'sample-json'|'sample-zip', runs}
+// In:  {cmd: 'file', name, runs, buf: ArrayBuffer}, {cmd: 'stream', runs, file: File}
+//      or {cmd: 'sample-json'|'sample-zip', runs}
 // Out: {type: 'status'|'result'|'done'|'error', ...}
 
 import 'dart:convert';
@@ -11,6 +12,7 @@ import 'package:rapid_archive/rapid_archive.dart' as rapid;
 import 'package:web/web.dart' as web;
 
 import 'bench.dart';
+import 'streaming.dart';
 
 final scope = globalContext as web.DedicatedWorkerGlobalScope;
 
@@ -34,6 +36,12 @@ Future<void> handle(JSObject msg) async {
       case 'sample-json':
         send({'type': 'status', 'msg': 'Generating 32 MB of JSON…'});
         await bench.runOn('sample orders.json', sampleJson(32 << 20));
+      case 'stream':
+        final f = msg['file'] as web.File;
+        final r = await StreamCheck((s) => send({'type': 'status', 'msg': s})).run(f);
+        send({'type': 'stream-result', 'result': r.toJson()});
+        send({'type': 'stream-done'});
+        return;
       case 'sample-zip':
         send({'type': 'status', 'msg': 'Generating a zip of 2,000 JSON files…'});
         await bench.runOn('sample orders.zip', sampleZip(2000, 16 * 1024));
