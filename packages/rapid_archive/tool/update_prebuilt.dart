@@ -2,14 +2,14 @@
 //
 //   dart run tool/update_prebuilt.dart v0.1.0
 //
-// Downloads SHA256SUMS from that release and rewrites hook/prebuilt.dart.
+// Downloads SHA256SUMS from that release and rewrites lib/src/prebuilt.dart.
 // Commit the result: from then on, apps get the verified prebuilt library
 // and don't need Rust.
 
 import 'dart:convert';
 import 'dart:io';
 
-import '../hook/prebuilt.dart' show prebuiltBaseUrl;
+import 'package:rapid_archive/src/prebuilt.dart' show prebuiltBaseUrl;
 
 Future<void> main(List<String> args) async {
   if (args.length != 1) {
@@ -67,8 +67,8 @@ const prebuiltHashes = <String, String>{
     out.writeln("  '$k':\n      '${entries[k]}',");
   }
   out.writeln('};');
-  File.fromUri(Platform.script.resolve('../hook/prebuilt.dart'))
+  File.fromUri(Platform.script.resolve('../lib/src/prebuilt.dart'))
       .writeAsStringSync(out.toString());
   stdout.writeln(
-      'hook/prebuilt.dart now points at $tag (${entries.length} libraries).');
+      'lib/src/prebuilt.dart now points at $tag (${entries.length} libraries).');
 }

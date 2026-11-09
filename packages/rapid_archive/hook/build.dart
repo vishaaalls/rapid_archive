@@ -4,7 +4,7 @@
 //
 // Runs automatically on `dart run`, `dart test`, `flutter run` and
 // `flutter build`. Released versions download a prebuilt, checksum-verified
-// library from GitHub Releases (see hook/prebuilt.dart), so app developers
+// library from GitHub Releases (see lib/src/prebuilt.dart), so app developers
 // don't need Rust. Without a prebuilt binary it builds with cargo, which
 // needs Rust plus the target (`rustup target add <triple>`). To force a
 // source build, add this to the app's pubspec.yaml:
@@ -20,7 +20,7 @@ import 'package:code_assets/code_assets.dart';
 import 'package:crypto/crypto.dart';
 import 'package:hooks/hooks.dart';
 
-import 'prebuilt.dart';
+import 'package:rapid_archive/src/prebuilt.dart';
 
 const _crate = 'rapid_archive';
 
@@ -111,7 +111,7 @@ String _cargo() {
 
 /// Downloads the prebuilt library for [triple] from the GitHub release that
 /// matches this package version, verifies its SHA-256 against the hash
-/// shipped in hook/prebuilt.dart, and caches it. Returns null when there is
+/// shipped in lib/src/prebuilt.dart, and caches it. Returns null when there is
 /// no prebuilt binary for this target (then we build with cargo).
 Future<Uri?> _prebuilt(BuildInput input, String triple, String libName) async {
   final hash = prebuiltHashes['$triple/$libName'];
@@ -237,7 +237,7 @@ void main(List<String> args) async {
           f.uri,
       ]);
     }
-    output.dependencies.add(input.packageRoot.resolve('hook/prebuilt.dart'));
+    output.dependencies.add(input.packageRoot.resolve('lib/src/prebuilt.dart'));
 
     output.assets.code.add(CodeAsset(
       package: input.packageName,

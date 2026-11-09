@@ -134,7 +134,7 @@ Memory use is about 6x `--mb`, so keep `--mb` at or below 1024 on a 16 GB machin
 
 Released versions download a prebuilt library for your target from this
 repo's GitHub Releases and check its SHA-256 against the hash shipped in
-`hook/prebuilt.dart`, so app developers don't need Rust. Targets: Android
+`lib/src/prebuilt.dart`, so app developers don't need Rust. Targets: Android
 (arm64, armv7, x86_64), iOS (device, simulator arm64 and x86_64), macOS
 (arm64, x86_64), Linux (x64, arm64) and Windows (x64, arm64). Web uses the
 embedded WebAssembly build.
@@ -151,7 +151,7 @@ hooks:
 
 Releasing: push a tag like `v0.1.0`. `.github/workflows/release.yml` builds
 every target and attaches the binaries plus `SHA256SUMS` to the release. Then
-run `dart run tool/update_prebuilt.dart v0.1.0` and commit `hook/prebuilt.dart`.
+run `dart run tool/update_prebuilt.dart v0.1.0` and commit `lib/src/prebuilt.dart`.
 
 ## Status
 
