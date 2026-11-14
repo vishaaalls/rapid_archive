@@ -5,8 +5,14 @@
 //
 // Calls that take a Dart buffer are *leaf* calls, which lets us pass
 // `Uint8List.address` straight to Rust with no copy. Outputs come back as
-// Rust-owned buffers wrapped with `asTypedList(finalizer: ra_free)`, so they
-// are zero-copy as well and freed by the GC.
+// Rust-owned buffers, which are copied onto the Dart heap and freed at once.
+//
+// They used to be wrapped zero-copy with `asTypedList(finalizer: ra_free)`,
+// but such external typed data doesn't survive leaving its isolate:
+// `Isolate.run` (and Flutter's `compute`) hand the result over without
+// copying, then shut the worker isolate down, which runs its native
+// finalizers and frees the memory under the receiver. The copy costs a
+// memcpy (about 10 GB/s), small next to compressing or decompressing.
 
 import 'dart:ffi';
 import 'dart:typed_data';
@@ -73,9 +79,6 @@ external Pointer<Utf8> ra_last_error();
 @Native<Void Function(Pointer<Uint8>)>(isLeaf: true)
 external void ra_free(Pointer<Uint8> p);
 
-final Pointer<NativeFinalizerFunction> _free =
-    Native.addressOf<NativeFunction<Void Function(Pointer<Uint8>)>>(ra_free)
-        .cast();
 
 /// Nothing to load on native platforms; the library is linked in.
 Future<void> ensureInitialized() async {}
@@ -90,13 +93,14 @@ final Pointer<RaZip> _zipOut = calloc<RaZip>();
 Never _fail() => throw RapidArchiveException(ra_last_error().toDartString());
 
 
-/// Wraps a Rust-owned buffer with no copy; the GC frees it later.
+/// Copies a Rust-owned buffer onto the Dart heap and frees it, so the result
+/// is an ordinary Uint8List that can cross isolates.
 Uint8List _owned(Pointer<Uint8> p, int len) {
-  if (len == 0) {
+  try {
+    return len == 0 ? Uint8List(0) : Uint8List.fromList(p.asTypedList(len));
+  } finally {
     ra_free(p);
-    return Uint8List(0);
   }
-  return p.asTypedList(len, finalizer: _free);
 }
 
 
@@ -138,11 +142,12 @@ RawZip zipDecode(List<int> zip) {
   if (ra_zip_decode(b.address, b.length, _zipOut) != 0) _fail();
   final r = _zipOut.ref;
   final Uint64List table;
-  if (r.count == 0) {
+  try {
+    table = r.count == 0
+        ? Uint64List(0)
+        : Uint64List.fromList(r.table.asTypedList(r.count * 5));
+  } finally {
     ra_free(r.table.cast());
-    table = Uint64List(0);
-  } else {
-    table = r.table.asTypedList(r.count * 5, finalizer: _free);
   }
   return RawZip(r.count, _owned(r.data, r.dataLen),
       _owned(r.names, r.namesLen), table);

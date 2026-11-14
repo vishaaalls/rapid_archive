@@ -1,3 +1,14 @@
+## 0.2.2
+
+- Fix: bytes returned by the encoders and decoders (gzip, zlib, raw
+  deflate, zip, and the contents of a decoded zip) were Rust-owned memory
+  freed by a native finalizer. Returned from `Isolate.run` or Flutter's
+  `compute`, which hand results over without copying and then shut the
+  worker isolate down, they arrived corrupted. They are now ordinary Dart
+  `Uint8List`s: a memcpy (64 MB gunzip 48.5 to 51.3 ms, 64 MB zip extract
+  11.8 to 14.8 ms on an Apple M4; compression unchanged). The native code is
+  unchanged.
+
 ## 0.2.1
 
 - Web: much faster when built with dart2wasm (bulk copies into and out of
