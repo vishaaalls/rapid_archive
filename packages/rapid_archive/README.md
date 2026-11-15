@@ -99,11 +99,37 @@ desktop. Its pure-Dart path is what Flutter **web** runs.
 | zip create, 8 x 4 MB | 289 ms | | 156 ms | **1.9x** |
 | zip extract all, 8 x 4 MB | 87 ms | | 19 ms | **4.5x** |
 
-Phones have 6 to 8 cores, so the parallel numbers should scale further. They
-still need measuring on real devices.
+Phones have 6 to 8 cores, so the parallel numbers should scale further; see
+the real-device results below.
 
 At 256 MB the gap holds or widens: gzip 2x (5.2x parallel), zip extract 5.7 to 6.8x
 (see `bench/RESULTS-linux-x64-4core-256mb.txt`).
+
+### Real devices
+
+#### iPhone 16 Pro
+
+iPhone 16 Pro (iOS 27.0.1, 6 cores), Flutter release build of the rapid_lab
+benchmark app, archive 4.6.0 (which uses the zlib in `dart:io` here), 32 MB
+JSON and a 500-file, 32 MB folder (raw output in
+`bench/RESULTS-iphone16pro.txt`):
+
+| Operation | archive | rapid_archive | Speedup |
+|---|---|---|---|
+| gzip compress, JSON | 322 ms | 195 ms | **1.6x** (output 5% smaller) |
+| gzip compress, JSON, `parallel: true` | 322 ms | 64 ms | **5.0x** (output 3% larger) |
+| gzip decompress, JSON | 33 ms | 23 ms | **1.5x** |
+| zip create, 500 files, 32 MB | 198 ms | 67 ms | **3.0x** (output 9% smaller) |
+| zip extract all, 500 files, 32 MB | 56 ms | 11 ms | **5.2x** |
+| zip create, 1 photo, 4.1 MB | 87 ms | 44 ms | **2.0x** |
+| zip extract all, 1 photo, 4.1 MB | 15 ms | 8 ms | **1.9x** |
+
+Every gzip result round-tripped and every extracted zip matched the original
+content.
+
+#### Android
+
+Not measured yet.
 
 ### Try it on your own files
 

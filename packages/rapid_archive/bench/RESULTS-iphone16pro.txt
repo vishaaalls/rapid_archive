@@ -1,0 +1,25 @@
+rapid_lab results
+iPhone 16 Pro [iPhone17,1] · iOS 27.0.1 · 6 cores · release
+Photo: Sample photo (4000×3000)
+Archive input: 32 MB JSON, 500 files
+Run 2026-11-15 with the rapid_lab app (Flutter release build); image 4.12.0, archive 4.6.0.
+
+| Step | package | rapid | Speedup | Size (pkg → rapid) | Note |
+| --- | --- | --- | --- | --- | --- |
+| Photo: decodeJpg (4000×3000) | 527 ms | 47.3 ms | 11.1x |  | max diff 73 |
+| Photo: copyResize → 1080w, cubic | 133 ms | 13.1 ms | 10.2x |  | identical |
+| Photo: copyResize → 1080w, Lanczos3 | n/a | 12.2 ms |  |  | rapid only |
+| Photo: adjustColor contrast+saturation | 2081 ms | 45.9 ms | 45.3x |  | identical |
+| Photo: gaussianBlur radius 5 | 788 ms | 86.7 ms | 9.1x |  | identical |
+| Photo: copyRotate 15°, linear | 4126 ms | 55.6 ms | 74.2x |  | identical |
+| Photo: encodeJpg q85 | 429 ms | 118 ms | 3.6x | 2.92 MB → 2.93 MB |  |
+| Photo: encodePng level 6 | 909 ms | 124 ms | 7.3x | 14.56 MB → 14.78 MB | identical |
+| Photo: Upload flow, drop-ins | 684 ms | 82.6 ms | 8.3x | 405 KB → 398 KB |  |
+| Photo: Upload flow, RapidPipeline | 684 ms | 74.2 ms | 9.2x | 405 KB → 359 KB | Lanczos3 |
+| Archive: gzip 32 MB JSON | 322 ms | 195 ms | 1.6x | 5.67 MB → 5.38 MB | round-trips |
+| Archive: gzip 32 MB JSON, parallel | 322 ms | 64.2 ms | 5.0x | 5.67 MB → 5.84 MB | round-trips |
+| Archive: gunzip 32 MB JSON | 33.2 ms | 22.8 ms | 1.5x |  | round-trips |
+| Archive: zip create, folder 500 files, 32 MB | 198 ms | 66.7 ms | 3.0x | 11.85 MB → 10.77 MB |  |
+| Archive: zip extract, folder 500 files, 32 MB | 56.3 ms | 10.8 ms | 5.2x |  | same content |
+| Archive: zip create, 1 photo(s), 4.1 MB | 86.8 ms | 43.9 ms | 2.0x | 4.10 MB → 4.09 MB |  |
+| Archive: zip extract, 1 photo(s), 4.1 MB | 15.2 ms | 7.9 ms | 1.9x |  | same content |
